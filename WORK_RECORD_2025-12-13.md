@@ -1195,3 +1195,57 @@ GX-Infrastructure-Backups/
 ---
 
 *End of Work Record - December 13, 2025*
+
+---
+
+## Session 8: PostgreSQL/Redis Fix (18:15 - 18:30 UTC)
+
+### Issue Identified
+
+`postgres-0`, `postgres-1`, `redis-0`, `redis-1` stuck in ContainerCreating:
+
+```
+MountVolume.NewMounter initialization failed for volume "pvc-xxx" : 
+path "/var/lib/rancher/k3s/storage/pvc-xxx_backend-mainnet_postgres-storage-postgres-0" does not exist
+```
+
+**Root Cause:**
+- PVCs were bound to VPS-4 (srv1117946) using local-path storage
+- VPS-4 was wiped during Phase 4.2 K3s reinstall
+- Local storage paths no longer existed
+
+### Fix Applied
+
+1. **Deleted stale PVCs** pointing to wiped VPS-4 storage
+2. **Added node affinity** to StatefulSets to prevent scheduling on TestNet node:
+   ```bash
+   kubectl patch statefulset postgres -n backend-mainnet --type=json \
+     -p '[{"op": "add", "path": "/spec/template/spec/affinity", "value": 
+       {"nodeAffinity": {"requiredDuringSchedulingIgnoredDuringExecution": 
+         {"nodeSelectorTerms": [{"matchExpressions": 
+           [{"key": "node-role", "operator": "In", "values": ["primary"]}]}]}}}}]'
+   
+   kubectl patch statefulset redis -n backend-mainnet --type=json \
+     -p '[{"op": "add", "path": "/spec/template/spec/affinity", "value": 
+       {"nodeAffinity": {"requiredDuringSchedulingIgnoredDuringExecution": 
+         {"nodeSelectorTerms": [{"matchExpressions": 
+           [{"key": "node-role", "operator": "In", "values": ["primary"]}]}]}}}}]'
+   ```
+
+3. **Recreated pods** - new PVCs provisioned on MainNet nodes
+
+### Final State
+
+| Pod | Status | Node | VPS |
+|-----|--------|------|-----|
+| postgres-0 | Running | srv1089618 | VPS-1 |
+| postgres-1 | Running | srv1092158 | VPS-3 |
+| postgres-2 | Running | srv1089624 | VPS-2 |
+| redis-0 | Running | srv1089624 | VPS-2 |
+| redis-1 | Running | srv1092158 | VPS-3 |
+| redis-2 | Running | srv1089618 | VPS-1 |
+
+**StatefulSets:** postgres 3/3, redis 3/3
+**MainNet isolation:** No backend pods on VPS-4 (TestNet)
+
+---
