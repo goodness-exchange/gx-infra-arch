@@ -445,3 +445,202 @@ Option B: **Full Restructuring** (HIGH RISK)
 - Requires maintenance window
 - Higher complexity, potential for extended downtime
 
+
+---
+
+## Phase 4.3: Full Restructuring Analysis and Implementation (COMPLETED)
+
+**Executed:** December 13, 2025 ~17:00 UTC
+**Objective:** Analyze VPS-4 CA dependencies and implement safe restructuring option
+
+### 4.3.1 CA Distribution Analysis
+
+```bash
+# List all CAs and their nodes
+kubectl get pods -n fabric -l app=ca -o custom-columns="NAME:.metadata.name,NODE:.spec.nodeName,STATUS:.status.phase"
+
+# Check CA PV node affinities
+for pv in $(kubectl get pv -o name | grep ca-data); do
+  echo "=== $pv ==="
+  kubectl get $pv -o jsonpath="{.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values[0]}"
+  echo ""
+done
+```
+
+**RESULTS:**
+
+| CA | Node | Purpose | PV Node Affinity |
+|----|------|---------|------------------|
+| ca-orderer-0 | srv1089624.hstgr.cloud (VPS-4) | Orderer certificates | srv1089624 (local-path) |
+| ca-org1-0 | srv1089624.hstgr.cloud (VPS-4) | Org1 certificates | srv1089624 (local-path) |
+| ca-tls-0 | srv1089624.hstgr.cloud (VPS-4) | TLS certificates | srv1089624 (local-path) |
+| ca-org2-0 | srv1092158.hstgr.cloud (VPS-3) | Org2 certificates | srv1092158 (local-path) |
+| ca-root-0 | srv1092158.hstgr.cloud (VPS-3) | Root CA | srv1092158 (local-path) |
+
+**CRITICAL FINDING:**
+- All CAs use local-path storage with hard node affinity
+- Migrating CAs would require data copy and PV recreation
+- Risk of CA data corruption is catastrophic for blockchain
+
+---
+
+### 4.3.2 Restructuring Options Evaluation
+
+| Option | Description | Risk Level | Recommendation |
+|--------|-------------|------------|----------------|
+| A | Keep VPS-4 in MainNet, use VPS-2 for TestNet | LOW | ✅ SELECTED |
+| B | Migrate 3 CAs from VPS-4 to other nodes | CATASTROPHIC | ❌ REJECTED |
+
+**Decision: Option A Selected**
+
+Rationale:
+- Zero risk to critical CA infrastructure
+- VPS-2 (srv1117946) PVs already bound to that node
+- Simple label change enables TestNet scheduling
+- Preserves 4-node HA MainNet cluster
+
+---
+
+### 4.3.3 Node Label Corrections
+
+**Issue Discovered:** Node label conflicts
+- VPS-4 (srv1089624) incorrectly labeled as `node-id=vps2`
+- VPS-2 (srv1117946) also labeled as `node-id=vps2` (duplicate)
+
+```bash
+# Fix VPS-4 node-id label from vps2 to vps4
+kubectl label node srv1089624.hstgr.cloud node-id=vps4 --overwrite
+# Result: node/srv1089624.hstgr.cloud labeled
+
+# Add testdev role to VPS-2 for TestNet scheduling
+kubectl label node srv1117946.hstgr.cloud node-role=testdev --overwrite
+# Result: node/srv1117946.hstgr.cloud labeled
+
+# Verify final node labels
+kubectl get nodes -o custom-columns="NAME:.metadata.name,NODE-ID:.metadata.labels.node-id,NODE-ROLE:.metadata.labels.node-role,ZONE:.metadata.labels.topology\.kubernetes\.io/zone"
+```
+
+**RESULTS:**
+
+| Node | Hostname | node-id | node-role | Zone |
+|------|----------|---------|-----------|------|
+| VPS-1 | srv1089618.hstgr.cloud | vps1 | primary | us-east |
+| VPS-2 | srv1117946.hstgr.cloud | vps2 | testdev | asia |
+| VPS-3 | srv1092158.hstgr.cloud | vps3 | primary | us-central |
+| VPS-4 | srv1089624.hstgr.cloud | vps4 | primary | us-west |
+
+---
+
+### 4.3.4 TestNet Recovery
+
+**Issue:** TestNet pods were Pending after label fix due to stale PVCs pointing to non-existent paths (VPS-2 was reinstalled, wiping local storage)
+
+```bash
+# Check TestNet pods (should now be scheduling)
+kubectl get pods -n fabric-testnet -o wide
+
+# Result: Pods scheduling but failing PV mount
+# MountVolume.NewMounter initialization failed - path does not exist
+
+# Clean up stale StatefulSets
+kubectl delete statefulset -n fabric-testnet --all --wait=false
+
+# Clean up stale PVCs
+kubectl delete pvc -n fabric-testnet --all
+
+# Clean up released PVs
+kubectl get pv | grep -E "Released|Failed" | grep fabric-testnet | awk '{print $1}' | xargs -r kubectl delete pv
+```
+
+**RESULTS:**
+```
+statefulset.apps "couchdb0-org1" deleted
+statefulset.apps "couchdb0-org2" deleted
+statefulset.apps "gxtv3-chaincode" deleted
+statefulset.apps "orderer0-ordererorg" deleted
+statefulset.apps "orderer1-ordererorg" deleted
+statefulset.apps "orderer2-ordererorg" deleted
+statefulset.apps "peer0-org1" deleted
+statefulset.apps "peer0-org2" deleted
+
+persistentvolumeclaim "couchdb0-org1-data" deleted
+persistentvolumeclaim "couchdb0-org2-data" deleted
+persistentvolumeclaim "orderer0-data" deleted
+persistentvolumeclaim "orderer1-data" deleted
+persistentvolumeclaim "orderer2-data" deleted
+persistentvolumeclaim "peer0-org1-data" deleted
+persistentvolumeclaim "peer0-org2-data" deleted
+```
+
+**TestNet Status:** Cleared - ready for fresh deployment when needed
+
+---
+
+### 4.3.5 MainNet Health Verification
+
+```bash
+# Verify MainNet pods are healthy
+kubectl get pods -n fabric | grep -E "^(ca-|orderer|peer)"
+```
+
+**RESULTS:**
+```
+ca-orderer-0           1/1     Running     0          34d
+ca-org1-0              1/1     Running     0          34d
+ca-org2-0              1/1     Running     0          34d
+ca-root-0              1/1     Running     0          34d
+ca-tls-0               1/1     Running     0          34d
+orderer0-0             1/1     Running     0          137m
+orderer1-0             1/1     Running     0          137m
+orderer2-0             1/1     Running     0          137m
+orderer3-0             1/1     Running     0          137m
+orderer4-0             1/1     Running     0          137m
+peer0-org1-0           1/1     Running     0          111m
+peer0-org2-0           1/1     Running     0          111m
+peer1-org1-0           1/1     Running     0          111m
+peer1-org2-0           1/1     Running     0          111m
+```
+
+**MainNet Health:** ✅ ALL HEALTHY
+- 5/5 CAs: Running
+- 5/5 Orderers: Running
+- 4/4 Peers: Running
+
+---
+
+### Phase 4 Summary
+
+**Final Architecture:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    GX Blockchain Infrastructure                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  MainNet Cluster (4-node HA etcd)                               │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
+│  │   VPS-1     │  │   VPS-3     │  │   VPS-4     │              │
+│  │ (primary)   │  │ (primary)   │  │ (primary)   │              │
+│  │ orderer0,3  │  │ orderer1,4  │  │ orderer2    │              │
+│  │ peer0-org1  │  │ peer1-org1  │  │ peer0-org2  │              │
+│  │             │  │ peer1-org2  │  │ ca-orderer  │              │
+│  │             │  │ ca-org2     │  │ ca-org1     │              │
+│  │             │  │ ca-root     │  │ ca-tls      │              │
+│  └─────────────┘  └─────────────┘  └─────────────┘              │
+│                                                                  │
+│  TestNet Node                                                    │
+│  ┌─────────────┐                                                 │
+│  │   VPS-2     │  ← control-plane + testdev role                │
+│  │ (testdev)   │    Ready for TestNet deployment                │
+│  └─────────────┘                                                 │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Key Outcomes:**
+1. VPS-4 remains in MainNet - critical CAs protected
+2. VPS-2 labeled as testdev for TestNet workloads
+3. Node label conflicts resolved (vps2/vps4 distinction)
+4. TestNet cleared for fresh deployment
+5. 4-node HA cluster maintained
+6. Zero downtime to MainNet during restructuring
