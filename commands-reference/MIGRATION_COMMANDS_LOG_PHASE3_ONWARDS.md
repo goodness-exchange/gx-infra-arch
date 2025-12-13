@@ -756,3 +756,60 @@ rclone ls gdrive-gx:GX-Infrastructure-Backups/
 | VPS-3 | 72.61.81.3 | srv1092158.hstgr.cloud | MainNet Node 3 |
 | VPS-4 | 72.61.116.210 | srv1117946.hstgr.cloud | DevNet + TestNet |
 | VPS-5 | 195.35.36.174 | srv711725.hstgr.cloud | Website + Partner |
+
+---
+
+## PostgreSQL/Redis PVC Fix (Post-Phase 5)
+
+**Issue:** postgres-0, postgres-1, redis-0, redis-1 stuck in ContainerCreating due to PVCs bound to wiped VPS-4 storage.
+
+### Commands Executed
+
+```bash
+# 1. Delete stale PVCs bound to VPS-4
+kubectl delete pvc -n backend-mainnet \
+  postgres-storage-postgres-0 \
+  postgres-storage-postgres-1 \
+  redis-storage-redis-0 \
+  redis-storage-redis-1
+
+# 2. Force delete stuck pods
+kubectl delete pod -n backend-mainnet postgres-0 postgres-1 redis-0 redis-1 \
+  --force --grace-period=0
+
+# 3. Add node affinity to PostgreSQL StatefulSet (MainNet nodes only)
+kubectl patch statefulset postgres -n backend-mainnet --type=json -p \
+  '[{"op": "add", "path": "/spec/template/spec/affinity", "value": 
+    {"nodeAffinity": {"requiredDuringSchedulingIgnoredDuringExecution": 
+      {"nodeSelectorTerms": [{"matchExpressions": 
+        [{"key": "node-role", "operator": "In", "values": ["primary"]}]}]}}}}]'
+
+# 4. Add node affinity to Redis StatefulSet (MainNet nodes only)
+kubectl patch statefulset redis -n backend-mainnet --type=json -p \
+  '[{"op": "add", "path": "/spec/template/spec/affinity", "value": 
+    {"nodeAffinity": {"requiredDuringSchedulingIgnoredDuringExecution": 
+      {"nodeSelectorTerms": [{"matchExpressions": 
+        [{"key": "node-role", "operator": "In", "values": ["primary"]}]}]}}}}]'
+
+# 5. Verify final state
+kubectl get pods -n backend-mainnet -l "app in (postgres,redis)" -o wide
+kubectl get statefulset -n backend-mainnet postgres redis
+```
+
+### Results
+
+```
+NAME         READY   STATUS    NODE
+postgres-0   1/1     Running   srv1089618.hstgr.cloud (VPS-1)
+postgres-1   1/1     Running   srv1092158.hstgr.cloud (VPS-3)
+postgres-2   1/1     Running   srv1089624.hstgr.cloud (VPS-2)
+redis-0      1/1     Running   srv1089624.hstgr.cloud (VPS-2)
+redis-1      1/1     Running   srv1092158.hstgr.cloud (VPS-3)
+redis-2      1/1     Running   srv1089618.hstgr.cloud (VPS-1)
+
+NAME       READY   AGE
+postgres   3/3     30d
+redis      3/3     30d
+```
+
+**Key Learning:** When adding a new node to the cluster, existing PVCs may get provisioned on that node by local-path provisioner. Adding node affinity to StatefulSets ensures pods only schedule on designated nodes (e.g., `node-role=primary` for MainNet workloads).
