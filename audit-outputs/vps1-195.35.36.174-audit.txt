@@ -1,0 +1,168 @@
+==========================================
+VPS-1 AUDIT - Sat Dec 13 11:47:46 AM UTC 2025
+==========================================
+
+=== SYSTEM INFORMATION ===
+Hostname: srv711725.hstgr.cloud
+OS: "AlmaLinux 10.0 (Purple Lion)"
+Kernel: 6.12.0-55.40.1.el10_0.x86_64
+Uptime: up 4 weeks, 5 days, 6 hours, 14 minutes
+
+=== HARDWARE RESOURCES ===
+CPU Cores: 2
+Total RAM: 7.7Gi
+Used RAM: 2.1Gi
+Disk Usage:
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda4        99G   14G   86G  14% /
+/dev/sda3       960M  205M  756M  22% /boot
+/dev/sda2       200M  8.4M  192M   5% /boot/efi
+
+=== RUNNING SERVICES (systemctl) ===
+  UNIT                       LOAD   ACTIVE SUB     DESCRIPTION
+  auditd.service             loaded active running Security Audit Logging Service
+  chronyd.service            loaded active running NTP client/server
+  containerd.service         loaded active running containerd container runtime
+  crond.service              loaded active running Command Scheduler
+  dbus-broker.service        loaded active running D-Bus System Message Bus
+  docker.service             loaded active running Docker Application Container Engine
+  getty@tty1.service         loaded active running Getty on tty1
+  gssproxy.service           loaded active running GSSAPI Proxy Daemon
+  httpd.service              loaded active running The Apache HTTP Server
+  irqbalance.service         loaded active running irqbalance daemon
+  k3s.service                loaded active running Lightweight Kubernetes
+  monarx-agent.service       loaded active running Monarx Agent - Security Scanner
+  NetworkManager.service     loaded active running Network Manager
+  polkit.service             loaded active running Authorization Manager
+  qemu-guest-agent.service   loaded active running QEMU Guest Agent
+  rpcbind.service            loaded active running RPC Bind
+  rsyslog.service            loaded active running System Logging Service
+  serial-getty@ttyS0.service loaded active running Serial Getty on ttyS0
+  sshd.service               loaded active running OpenSSH server daemon
+  systemd-journald.service   loaded active running Journal Service
+  systemd-logind.service     loaded active running User Login Management
+  systemd-udevd.service      loaded active running Rule-based Manager for Device Events and Files
+  systemd-userdbd.service    loaded active running User Database Manager
+  tuned.service              loaded active running Dynamic System Tuning Daemon
+  user@0.service             loaded active running User Manager for UID 0
+
+25 loaded units listed.
+
+=== DOCKER STATUS ===
+Docker Version: Docker version 28.5.2, build ecc6942
+
+Running Containers:
+NAMES              IMAGE                     STATUS       PORTS
+gxcoin-app-green   gx-marketing-site:green   Up 5 hours   0.0.0.0:3003->3000/tcp, [::]:3003->3000/tcp
+
+All Containers (including stopped):
+NAMES              IMAGE                     STATUS
+gxcoin-app-green   gx-marketing-site:green   Up 5 hours
+
+Docker Images:
+REPOSITORY                                                                                                                                                                            TAG       SIZE
+gx-marketing-site                                                                                                                                                                     green     314MB
+dev-peer0.partnerorg1.goodness.exchange-gxtv3_1.0-110582433dd019b53c487cc89b13b0cabb6e2f7023adb11d444e31dd2901c96a-2b7eb42137d96a09c45943ef226e9d0cc262a59188e4dde5bd508cf076797d0d   latest    173MB
+hyperledger/fabric-ccenv                                                                                                                                                              2.5       641MB
+hyperledger/fabric-baseos                                                                                                                                                             2.5       152MB
+
+Docker Disk Usage:
+TYPE            TOTAL     ACTIVE    SIZE      RECLAIMABLE
+Images          4         1         1.05GB    736.4MB (70%)
+Containers      1         1         114.7kB   0B (0%)
+Local Volumes   0         0         0B        0B
+Build Cache     24        0         4.617GB   4.617GB
+
+=== KUBERNETES STATUS ===
+Kubectl Version: Client Version: v1.33.5+k3s1
+
+Nodes:
+NAME                    STATUS   ROLES                  AGE   VERSION        INTERNAL-IP     EXTERNAL-IP   OS-IMAGE                       KERNEL-VERSION                 CONTAINER-RUNTIME
+srv711725.hstgr.cloud   Ready    control-plane,master   33d   v1.33.5+k3s1   195.35.36.174   <none>        AlmaLinux 10.0 (Purple Lion)   6.12.0-55.40.1.el10_0.x86_64   containerd://2.1.4-k3s1
+
+All Pods (all namespaces):
+NAMESPACE        NAME                                      READY   STATUS    RESTARTS       AGE   IP           NODE                    NOMINATED NODE   READINESS GATES
+gx-partnerorg1   partnerorg1-cli-7bc54494d4-g8rw9          1/1     Running   0              32d   10.42.0.39   srv711725.hstgr.cloud   <none>           <none>
+gx-partnerorg1   partnerorg1-peer-0                        2/2     Running   0              32d   10.42.0.40   srv711725.hstgr.cloud   <none>           <none>
+kube-system      coredns-64fd4b4794-wwkmr                  1/1     Running   0              33d   10.42.0.4    srv711725.hstgr.cloud   <none>           <none>
+kube-system      local-path-provisioner-774c6665dc-2b4jf   1/1     Running   11 (33d ago)   33d   10.42.0.3    srv711725.hstgr.cloud   <none>           <none>
+kube-system      metrics-server-7bfffcd44-hvsn5            1/1     Running   10 (33d ago)   33d   10.42.0.2    srv711725.hstgr.cloud   <none>           <none>
+
+All Services (all namespaces):
+NAMESPACE        NAME                         TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)                         AGE
+default          kubernetes                   ClusterIP   10.43.0.1       <none>        443/TCP                         33d
+gx-partnerorg1   couchdb0-partnerorg1         ClusterIP   10.43.83.177    <none>        5984/TCP                        33d
+gx-partnerorg1   peer0-operations             NodePort    10.43.71.181    <none>        9443:30943/TCP                  33d
+gx-partnerorg1   peer0-partnerorg1            NodePort    10.43.9.214     <none>        7051:30051/TCP,7052:32211/TCP   33d
+gx-partnerorg1   peer0-partnerorg1-headless   ClusterIP   None            <none>        7051/TCP,7052/TCP               33d
+kube-system      kube-dns                     ClusterIP   10.43.0.10      <none>        53/UDP,53/TCP,9153/TCP          33d
+kube-system      metrics-server               ClusterIP   10.43.126.199   <none>        443/TCP                         33d
+
+All Deployments (all namespaces):
+NAMESPACE        NAME                     READY   UP-TO-DATE   AVAILABLE   AGE
+gx-partnerorg1   partnerorg1-cli          1/1     1            1           33d
+kube-system      coredns                  1/1     1            1           33d
+kube-system      local-path-provisioner   1/1     1            1           33d
+kube-system      metrics-server           1/1     1            1           33d
+
+Namespaces:
+NAME              STATUS   AGE
+default           Active   33d
+gx-partnerorg1    Active   33d
+kube-node-lease   Active   33d
+kube-public       Active   33d
+kube-system       Active   33d
+
+=== LISTENING PORTS ===
+tcp   LISTEN 0      4096       127.0.0.1:10010      0.0.0.0:*    containerd
+tcp   LISTEN 0      4096         0.0.0.0:3003       0.0.0.0:*    docker-proxy (gx-marketing-site)
+tcp   LISTEN 0      5            0.0.0.0:7050       0.0.0.0:*    socat (orderer forwarding)
+tcp   LISTEN 0      4096       127.0.0.1:65529      0.0.0.0:*    monarx-agent
+tcp   LISTEN 0      4096         0.0.0.0:111        0.0.0.0:*    rpcbind
+tcp   LISTEN 0      128          0.0.0.0:22         0.0.0.0:*    sshd
+tcp   LISTEN 0      4096       127.0.0.1:10259      0.0.0.0:*    k3s-server
+tcp   LISTEN 0      4096       127.0.0.1:10258      0.0.0.0:*    k3s-server
+tcp   LISTEN 0      4096       127.0.0.1:10257      0.0.0.0:*    k3s-server
+tcp   LISTEN 0      4096       127.0.0.1:10256      0.0.0.0:*    k3s-server
+tcp   LISTEN 0      4096       127.0.0.1:10249      0.0.0.0:*    k3s-server
+tcp   LISTEN 0      4096       127.0.0.1:10248      0.0.0.0:*    k3s-server
+tcp   LISTEN 0      4096       127.0.0.1:6444       0.0.0.0:*    k3s-server
+tcp   LISTEN 0      4096               *:10250            *:*    k3s-server
+tcp   LISTEN 0      4096               *:6443             *:*    k3s-server (Kubernetes API)
+tcp   LISTEN 0      511                *:80               *:*    httpd (Apache)
+tcp   LISTEN 0      128             [::]:22            [::]:*    sshd
+tcp   LISTEN 0      511                *:443              *:*    httpd (Apache HTTPS)
+
+=== WEB SERVERS ===
+Apache HTTPD: Running on ports 80 and 443
+Nginx: Not installed
+
+=== FRONTEND APPLICATIONS ===
+/var/www/ contents:
+- cgi-bin (empty)
+- gxcoin.money (website files)
+- html (empty)
+
+=== PM2 PROCESSES ===
+PM2 not installed
+
+=== CRON JOBS ===
+No crontab configured
+
+=== BACKUP CONFIGURATION ===
+Rclone: Not configured
+Backup scripts: None found
+
+=== CERTIFICATE AUTHORITIES ===
+Standard CA certificates found in containerd
+No dedicated Fabric CA running
+
+=== GRAFANA/MONITORING ===
+Grafana: Not installed
+Prometheus: Not installed
+
+=== DISK SPACE ANALYSIS ===
+/var: 11G (logs, containers)
+/usr: 1.6G
+/run: 1.3G
+/root: 1.1G

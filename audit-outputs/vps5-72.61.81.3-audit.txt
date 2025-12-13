@@ -1,0 +1,95 @@
+==========================================
+VPS-5 AUDIT - Sat Dec 13 11:55:44 AM UTC 2025
+==========================================
+
+=== SYSTEM INFORMATION ===
+Hostname: srv1092158.hstgr.cloud
+OS: "AlmaLinux 10.0 (Purple Lion)"
+Kernel: 6.12.0-55.40.1.el10_0.x86_64
+Uptime: up 6 weeks, 3 days, 3 hours, 18 minutes
+
+=== HARDWARE RESOURCES ===
+CPU Cores: 8
+Total RAM: 31Gi
+Used RAM: 6.7Gi (LOW - good headroom)
+Disk Usage:
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda4       399G  205G  195G  52% / (MODERATE)
+/dev/sda3       960M  200M  761M  21% /boot
+/dev/sda2       200M  8.4M  192M   5% /boot/efi
+
+=== K3S ROLE ===
+Role: CONTROL-PLANE NODE (k3s.service, etcd, master)
+
+=== DOCKER STATUS ===
+Docker: NOT INSTALLED
+All containers managed by containerd via K3s
+
+=== KUBERNETES PODS ON THIS NODE ===
+
+BACKEND-MAINNET (API Services):
+- svc-admin (1/1 Ready)
+- svc-governance (1/1 Ready + 1 not ready)
+- svc-identity (1/1 Ready)
+- svc-loanpool (1/1 Ready + 1 not ready)
+- svc-organization (1/1 Ready + 1 not ready)
+- svc-tax (0/1 not ready)
+- svc-tokenomics (0/1 not ready)
+
+FABRIC MAINNET:
+Certificate Authorities:
+- ca-org2-0 (Org2 CA)
+- ca-root-0 (Root CA)
+
+Orderers:
+- orderer1-0
+- orderer4-0
+
+Peers:
+- peer1-org1-0
+- peer1-org2-0
+
+Database:
+- couchdb-peer0-org2-0
+- postgres-0 (CA database)
+
+INFRASTRUCTURE:
+- metallb-system/speaker (load balancer)
+- monitoring/node-exporter
+- monitoring/promtail
+
+=== WEB SERVER ===
+Apache HTTPD: RUNNING on ports 80 and 443
+Content: EMPTY (/var/www has no content)
+This is unnecessary and should be disabled.
+
+=== LISTENING PORTS ===
+- 22: SSH
+- 80: Apache HTTPD (unnecessary)
+- 443: Apache HTTPD HTTPS (unnecessary)
+- 111: RPC Bind
+- 2379-2382: etcd cluster ports
+- 6443: Kubernetes API Server
+- 7472, 7946: MetalLB speaker
+- 9100: Node exporter (Prometheus)
+- 10248-10259: K3s controller ports
+
+=== BACKUP CONFIGURATION ===
+Rclone: NOT configured
+Backup scripts: NONE
+
+=== DISK ANALYSIS ===
+/var: 193GB (container data, logs, PVCs)
+/run: 8.8GB
+/tmp: 7.1GB
+/usr: 823MB
+Total Used: 205GB (52%)
+
+=== INTENDED VS ACTUAL ===
+INTENDED: MainNet Node 3
+ACTUAL: Control-plane node running MainNet components
+
+This node IS correctly running MainNet components, but:
+1. Apache HTTPD should be disabled
+2. No backup configuration
+3. Some backend pods showing 0/1 ready status

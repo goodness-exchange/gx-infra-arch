@@ -1,0 +1,126 @@
+==========================================
+VPS-3 AUDIT - Sat Dec 13 11:52:27 AM UTC 2025
+==========================================
+
+=== SYSTEM INFORMATION ===
+Hostname: srv1089618.hstgr.cloud
+OS: "AlmaLinux 10.1 (Heliotrope Lion)"
+Kernel: 6.12.0-55.40.1.el10_0.x86_64
+Uptime: up 6 weeks, 4 days, 8 hours, 15 minutes
+
+=== HARDWARE RESOURCES ===
+CPU Cores: 8
+Total RAM: 31Gi
+Used RAM: 21Gi (HIGH - 67%)
+Disk Usage:
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda4       399G  312G   88G  79% / (CRITICAL - 79% used)
+/dev/sda3       960M  290M  671M  31% /boot
+/dev/sda2       200M  8.5M  192M   5% /boot/efi
+
+=== CRITICAL FINDING: DUPLICATE FABRIC DEPLOYMENTS ===
+This server is running BOTH:
+1. Docker Compose-based Fabric network (17 containers)
+2. Kubernetes-based Fabric pods
+
+DOCKER COMPOSE FABRIC NETWORK (RUNNING):
+Orderers (5):
+- orderer0.ordererorg.prod.goodness.exchange (port 27050)
+- orderer1.ordererorg.prod.goodness.exchange (port 28050)
+- orderer2.ordererorg.prod.goodness.exchange (port 29050)
+- orderer3.ordererorg.prod.goodness.exchange (port 30050)
+- orderer4.ordererorg.prod.goodness.exchange (port 31050)
+
+Peers (4):
+- peer0.org1.prod.goodness.exchange (port 7051)
+- peer1.org1.prod.goodness.exchange (port 8051)
+- peer0.org2.prod.goodness.exchange (port 9051)
+- peer1.org2.prod.goodness.exchange (port 10051)
+
+CouchDB (4):
+- couchdb0 (port 5984)
+- couchdb1 (port 6984)
+- couchdb2 (port 7984)
+- couchdb3 (port 8984)
+
+Chaincode (3):
+- dev-peer0.org1 chaincode
+- dev-peer0.org2 chaincode
+- dev-peer1.org1 chaincode
+
+CA Database:
+- postgres.ca (port 5433)
+
+KUBERNETES FABRIC PODS (ALSO RUNNING):
+- orderer0-0
+- orderer3-0
+- peer0-org1-0
+- couchdb-peer1-org1-0
+- gxtv3-chaincode-0
+
+=== KUBERNETES PODS ON THIS NODE ===
+backend-mainnet:
+- outbox-submitter (140 restarts in 2d6h - HIGH)
+- projector
+- redis-2
+- svc-admin
+- svc-identity
+
+fabric:
+- orderer0-0, orderer3-0
+- peer0-org1-0
+- couchdb-peer1-org1-0
+- gxtv3-chaincode-0
+
+monitoring:
+- loki
+- node-exporter
+- promtail
+
+=== DOCKER IMAGES (TAKING SIGNIFICANT SPACE) ===
+- gx-protocol/svc-identity:2.0.7, 2.0.8, 2.0.9 (1.61GB each - multiple versions)
+- gx-protocol/projector:2.0.8 (1.34GB)
+- dev-peer chaincode images (173MB each x3)
+- hyperledger/fabric-peer:2.5 (153MB)
+- hyperledger/fabric-orderer:2.5 (119MB)
+- couchdb:3.3.3 (222MB)
+- postgres:14-alpine (272MB)
+
+=== DOCKER BUILD CACHE ===
+Build Cache: 76.17GB total, 70.51GB reclaimable (CRITICAL)
+
+=== DISK USAGE BREAKDOWN ===
+Total: 399GB
+Used: 312GB (79%)
+Available: 88GB
+
+Docker Build Cache: ~76GB (RECLAIMABLE: 70GB)
+Docker Images: ~6.6GB (Reclaimable: 952MB)
+Docker Volumes: ~754MB
+
+=== PORT CONFLICTS ===
+Multiple services running on similar ports:
+- Docker orderers: 27050-31050
+- Kubernetes orderers: Different ports via NodePort
+- CouchDB: 5984, 6984, 7984, 8984 (Docker)
+- CouchDB Kubernetes on different internal ports
+
+=== RUNNING SERVICES ===
+- k3s.service (Kubernetes)
+- docker.service
+- httpd.service (Apache)
+- containerd.service
+- sshd.service
+
+=== BACKUP CONFIGURATION ===
+Rclone: Not configured
+Backup scripts: None found
+
+=== WEB SERVERS ===
+Apache HTTPD: Running on ports 80 and 443
+No application content found
+
+=== SECURITY NOTES ===
+- monarx-agent security scanner running
+- VS Code server processes detected (development access)
+- Multiple kubectl port-forward sessions active

@@ -1,0 +1,84 @@
+==========================================
+VPS-4 AUDIT - Sat Dec 13 11:55:18 AM UTC 2025
+==========================================
+
+=== SYSTEM INFORMATION ===
+Hostname: srv1117946.hstgr.cloud
+OS: "AlmaLinux 10.0 (Purple Lion)"
+Kernel: 6.12.0-55.42.1.el10_0.x86_64
+Uptime: up 4 weeks, 3 days, 6 hours, 52 minutes
+
+=== HARDWARE RESOURCES ===
+CPU Cores: 8
+Total RAM: 31Gi
+Used RAM: 5.2Gi (LOW - good headroom)
+Disk Usage:
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda4       399G   75G  325G  19% / (HEALTHY)
+/dev/sda3       960M  272M  689M  29% /boot
+/dev/sda2       200M  8.4M  192M   5% /boot/efi
+
+=== K3S ROLE ===
+Role: WORKER NODE (k3s-agent, NOT control-plane)
+
+=== DOCKER STATUS ===
+Docker Version: 29.0.2
+Docker is installed but NO containers running
+No images present
+
+=== KUBERNETES PODS ON THIS NODE ===
+(From cluster-wide view via VPS-2):
+
+BACKEND-MAINNET:
+- postgres-0, postgres-1 (PostgreSQL HA replicas)
+- redis-0, redis-1 (Redis HA replicas)
+
+BACKEND-TESTNET:
+- outbox-submitter (1353 restarts in 19d - CRITICAL)
+- postgres-0
+- projector
+- redis-0
+- svc-identity
+
+FABRIC-TESTNET (ENTIRE TESTNET RUNS HERE):
+- orderer0-ordererorg-0
+- orderer1-ordererorg-0
+- orderer2-ordererorg-0
+- peer0-org1-0
+- peer0-org2-0
+- couchdb0-org1-0
+- couchdb0-org2-0
+- gxtv3-chaincode-0
+- testnet-tools
+- node-debugger
+
+CERT-MANAGER:
+- cert-manager
+- cert-manager-cainjector
+- cert-manager-webhook
+
+=== CRITICAL ISSUES ===
+1. TestNet outbox-submitter has 1353 restarts - likely crashing repeatedly
+2. No web server running (as expected for a worker node)
+3. No backup configuration
+
+=== LISTENING PORTS ===
+- 22: SSH
+- 111: RPC Bind
+- 6444: K3s agent (local)
+- 7472, 7946: MetalLB speaker
+- 9100: Node exporter (Prometheus metrics)
+- 10248-10256: Kubelet ports
+
+=== DISK ANALYSIS ===
+/var: 68GB (container data, logs)
+/run: 8.1GB
+/usr: 1.4GB
+/root: 893MB
+Total Used: 75GB (19%)
+
+=== INTENDED VS ACTUAL ===
+INTENDED: MainNet Node 2
+ACTUAL: Worker node running TestNet + some MainNet database replicas
+
+This is a MAJOR ARCHITECTURAL MISMATCH.
