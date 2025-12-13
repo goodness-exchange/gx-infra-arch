@@ -644,3 +644,115 @@ peer1-org2-0           1/1     Running     0          111m
 4. TestNet cleared for fresh deployment
 5. 4-node HA cluster maintained
 6. Zero downtime to MainNet during restructuring
+
+---
+
+## Phase 5: Backup Implementation (COMPLETED)
+
+**Executed:** December 13, 2025 17:30-18:00 UTC
+**Objective:** Implement automated Google Drive backups for all infrastructure
+
+### 5.1 rclone Installation
+
+```bash
+# Install on servers without rclone (VPS-2, VPS-3, VPS-4, VPS-5)
+dnf install -y unzip
+curl -s https://rclone.org/install.sh | bash
+
+# Verify installation
+rclone version
+```
+
+**RESULTS:** rclone v1.72.1 installed on all 5 servers
+
+---
+
+### 5.2 Google Drive Configuration
+
+```bash
+# VPS-1 already had gdrive-gx: remote configured
+# Copy config to other servers
+ssh root@72.60.210.201 'cat ~/.config/rclone/rclone.conf' | \
+  ssh root@<TARGET_IP> 'mkdir -p ~/.config/rclone && cat > ~/.config/rclone/rclone.conf && chmod 600 ~/.config/rclone/rclone.conf'
+
+# Verify remote works
+rclone lsd gdrive-gx:
+
+# Create backup directories
+rclone mkdir gdrive-gx:GX-Infrastructure-Backups/mainnet
+rclone mkdir gdrive-gx:GX-Infrastructure-Backups/testnet
+rclone mkdir gdrive-gx:GX-Infrastructure-Backups/website
+```
+
+---
+
+### 5.3 Backup Scripts
+
+**MainNet Backup (VPS-1: /root/scripts/backup-mainnet.sh):**
+- Backs up Fabric CA data, secrets, PostgreSQL, Redis, K8s resources, etcd
+- 30-day retention policy
+- Uploads compressed archive to gdrive-gx:GX-Infrastructure-Backups/mainnet/
+
+**TestNet Backup (VPS-4: /root/scripts/backup-testnet.sh):**
+- Backs up fabric-testnet and backend-testnet namespaces
+- 14-day retention policy
+- Uploads to gdrive-gx:GX-Infrastructure-Backups/testnet/
+
+**Website Backup (VPS-5: /root/scripts/backup-website.sh):**
+- Backs up /var/www/gxcoin.money, Docker state, K8s resources
+- 30-day retention policy
+- Uploads to gdrive-gx:GX-Infrastructure-Backups/website/
+
+---
+
+### 5.4 Cron Configuration
+
+```bash
+# VPS-1 (MainNet - 4 AM UTC)
+(crontab -l 2>/dev/null; echo "0 4 * * * /root/scripts/backup-mainnet.sh >> /var/log/backup-mainnet.log 2>&1") | crontab -
+
+# VPS-4 (TestNet - 3 AM UTC)
+(crontab -l 2>/dev/null; echo "0 3 * * * /root/scripts/backup-testnet.sh >> /var/log/backup-testnet.log 2>&1") | crontab -
+
+# VPS-5 (Website - 2 AM UTC)
+(crontab -l 2>/dev/null; echo "0 2 * * * /root/scripts/backup-website.sh >> /var/log/backup-website.log 2>&1") | crontab -
+```
+
+---
+
+### 5.5 Verification
+
+```bash
+# List all backups on Google Drive
+rclone ls gdrive-gx:GX-Infrastructure-Backups/
+
+# Results:
+#  13130070 mainnet/backup-mainnet-20251213_173825.tar.gz
+#     31952 testnet/backup-testnet-20251213_173927.tar.gz
+# 423213985 website/backup-website-20251213_173953.tar.gz
+#  27406636 pre-migration/gx-full-backup-20251212-093047.tar.gz
+```
+
+---
+
+### Phase 5 Summary
+
+| Component | Backup Location | Schedule | Retention |
+|-----------|-----------------|----------|-----------|
+| MainNet | gdrive-gx:GX-Infrastructure-Backups/mainnet/ | 4 AM UTC | 30 days |
+| TestNet | gdrive-gx:GX-Infrastructure-Backups/testnet/ | 3 AM UTC | 14 days |
+| Website | gdrive-gx:GX-Infrastructure-Backups/website/ | 2 AM UTC | 30 days |
+
+**Total Backup Size (Initial):** ~436 MB
+
+---
+
+## VPS Naming Convention (Updated)
+
+| VPS | IP Address | Hostname | Role |
+|-----|------------|----------|------|
+| VPS-1 | 72.60.210.201 | srv1089618.hstgr.cloud | MainNet Node 1 (Primary) |
+| VPS-2 | 217.196.51.190 | srv1089624.hstgr.cloud | MainNet Node 2 (CAs) |
+| VPS-3 | 72.61.81.3 | srv1092158.hstgr.cloud | MainNet Node 3 |
+| VPS-4 | 72.61.116.210 | srv1117946.hstgr.cloud | DevNet + TestNet |
+| VPS-5 | 195.35.36.174 | srv711725.hstgr.cloud | Website + Partner |
