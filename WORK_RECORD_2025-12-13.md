@@ -991,3 +991,207 @@ kubectl delete pv <stale-pvs>
 ---
 
 *End of Work Record*
+
+---
+
+## Session 7: Phase 5 Backup Implementation (17:30 - 18:00 UTC)
+
+### Work Completed
+
+#### 1. VPS Naming Convention Update
+
+**Resolution:** Swapped VPS-2 and VPS-4 naming to match target architecture:
+
+| New Name | IP | Hostname | Role |
+|----------|-----|----------|------|
+| VPS-1 | 72.60.210.201 | srv1089618.hstgr.cloud | MainNet Node 1 |
+| VPS-2 | 217.196.51.190 | srv1089624.hstgr.cloud | MainNet Node 2 (CAs) |
+| VPS-3 | 72.61.81.3 | srv1092158.hstgr.cloud | MainNet Node 3 |
+| VPS-4 | 72.61.116.210 | srv1117946.hstgr.cloud | DevNet + TestNet |
+| VPS-5 | 195.35.36.174 | srv711725.hstgr.cloud | Website + Partner |
+
+This aligns with the target architecture without any risky component migrations.
+
+#### 2. Phase 5.1: rclone Installation (COMPLETED)
+
+Installed rclone v1.72.1 on all servers:
+
+| Server | rclone Status | Notes |
+|--------|---------------|-------|
+| VPS-1 | Already installed | Had existing gdrive-gx: remote |
+| VPS-2 | Installed | Config copied from VPS-1 |
+| VPS-3 | Installed | Config copied from VPS-1 |
+| VPS-4 | Installed | Config copied from VPS-1 |
+| VPS-5 | Installed | Config copied from VPS-1 |
+
+```bash
+# Installation command (VPS-2,3,4,5)
+dnf install -y unzip
+curl -s https://rclone.org/install.sh | bash
+```
+
+#### 3. Phase 5.2: Google Drive Configuration (COMPLETED)
+
+- Existing remote `gdrive-gx:` already configured on VPS-1
+- Shared OAuth token to all servers by copying `~/.config/rclone/rclone.conf`
+- Created backup directory structure:
+  - `gdrive-gx:GX-Infrastructure-Backups/mainnet/`
+  - `gdrive-gx:GX-Infrastructure-Backups/testnet/`
+  - `gdrive-gx:GX-Infrastructure-Backups/website/`
+
+#### 4. Phase 5.3: Backup Scripts (COMPLETED)
+
+**Scripts Created:**
+
+| Script | Server | Purpose |
+|--------|--------|---------|
+| /root/scripts/backup-mainnet.sh | VPS-1 | Comprehensive MainNet backup |
+| /root/scripts/backup-testnet.sh | VPS-4 | TestNet/DevNet backup |
+| /root/scripts/backup-website.sh | VPS-5 | Website and Docker backup |
+
+**MainNet Backup Includes:**
+- Fabric CA data (ca-root, ca-org1, ca-org2, ca-orderer, ca-tls)
+- Fabric secrets (crypto materials)
+- PostgreSQL database dump
+- Redis snapshot
+- All Kubernetes resources (yaml exports)
+- etcd snapshots
+- K3s configuration files
+
+**Retention Policies:**
+- MainNet: 30 days
+- TestNet: 14 days
+- Website: 30 days
+
+#### 5. Phase 5.4: Backup Testing (COMPLETED)
+
+| Backup | Size | Duration | Status |
+|--------|------|----------|--------|
+| MainNet | 12.5 MB | ~50 sec | ✅ Success |
+| TestNet | 31 KB | ~20 sec | ✅ Success |
+| Website | 403 MB | ~80 sec | ✅ Success |
+
+#### 6. Phase 5.5: Cron Jobs (COMPLETED)
+
+| Server | Schedule | Job |
+|--------|----------|-----|
+| VPS-1 | 4:00 AM UTC daily | MainNet backup |
+| VPS-4 | 3:00 AM UTC daily | TestNet backup |
+| VPS-5 | 2:00 AM UTC daily | Website backup |
+
+```bash
+# VPS-1 crontab
+0 4 * * * /root/scripts/backup-mainnet.sh >> /var/log/backup-mainnet.log 2>&1
+
+# VPS-4 crontab
+0 3 * * * /root/scripts/backup-testnet.sh >> /var/log/backup-testnet.log 2>&1
+
+# VPS-5 crontab
+0 2 * * * /root/scripts/backup-website.sh >> /var/log/backup-website.log 2>&1
+```
+
+### Google Drive Backup Summary
+
+```
+GX-Infrastructure-Backups/
+├── mainnet/
+│   └── backup-mainnet-20251213_173825.tar.gz (12.5 MB)
+├── testnet/
+│   └── backup-testnet-20251213_173927.tar.gz (31 KB)
+├── website/
+│   └── backup-website-20251213_173953.tar.gz (403 MB)
+└── pre-migration/
+    └── gx-full-backup-20251212-093047.tar.gz (27 MB)
+```
+
+### Challenges Encountered
+
+1. **rclone Installation**
+   - Problem: Install script requires `unzip`
+   - Solution: `dnf install -y unzip` before rclone install
+
+2. **PostgreSQL Pod Selection**
+   - Problem: postgres-0 was in ContainerCreating, postgres-2 running
+   - Solution: Updated script to select running pod dynamically
+
+### Key Files Created
+
+| File | Server | Purpose |
+|------|--------|---------|
+| /root/scripts/backup-mainnet.sh | VPS-1 | MainNet backup script |
+| /root/scripts/backup-testnet.sh | VPS-4 | TestNet backup script |
+| /root/scripts/backup-website.sh | VPS-5 | Website backup script |
+| ~/.config/rclone/rclone.conf | All | Google Drive configuration |
+
+---
+
+## Final Summary - All Phases Complete
+
+### Phase Completion Status
+
+| Phase | Status | Key Outcomes |
+|-------|--------|--------------|
+| Phase 0: Emergency Stabilization | ✅ COMPLETE | Disk cleanup, Docker Compose stopped, DB password fixed |
+| Phase 1: Pre-Migration Preparation | ✅ COMPLETE | Docker on VPS-3, backups, checklist verified |
+| Phase 2: Security Hardening | ✅ COMPLETE | SSH keys only, services disabled, firewall |
+| Phase 3: Infrastructure Setup | ✅ COMPLETE | PDBs, NetworkPolicies, Anti-Affinity, core.yaml |
+| Phase 4.1: Pre-Restructuring Assessment | ✅ COMPLETE | VPS-4 CA analysis |
+| Phase 4.2: VPS-2 Promotion | ✅ COMPLETE | 4-node etcd HA cluster |
+| Phase 4.3: Full Restructuring | ✅ COMPLETE | VPS naming resolved, TestNet on VPS-4 |
+| Phase 5: Backup Implementation | ✅ COMPLETE | rclone + Google Drive + cron jobs |
+
+### Final Architecture
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                        GX Blockchain Infrastructure                           │
+│                           (Final Architecture)                                │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  MainNet Cluster (4-node HA etcd)                                            │
+│  ═══════════════════════════════                                             │
+│                                                                               │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐               │
+│  │     VPS-1       │  │     VPS-2       │  │     VPS-3       │               │
+│  │ 72.60.210.201   │  │ 217.196.51.190  │  │  72.61.81.3     │               │
+│  │                 │  │                 │  │                 │               │
+│  │ • orderer0,3    │  │ • orderer2      │  │ • orderer1,4    │               │
+│  │ • peer0-org1    │  │ • peer0-org2    │  │ • peer1-org1/2  │               │
+│  │ • Monitoring    │  │ • ca-orderer    │  │ • ca-org2       │               │
+│  │ • Backup Primary│  │ • ca-org1       │  │ • ca-root       │               │
+│  │                 │  │ • ca-tls        │  │ • PostgreSQL    │               │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘               │
+│                                                                               │
+│  TestNet Node                           Website Node                          │
+│  ═══════════                            ════════════                          │
+│                                                                               │
+│  ┌─────────────────┐                    ┌─────────────────┐                  │
+│  │     VPS-4       │                    │     VPS-5       │                  │
+│  │ 72.61.116.210   │                    │ 195.35.36.174   │                  │
+│  │                 │                    │                 │                  │
+│  │ • TestNet       │                    │ • gxcoin.money  │                  │
+│  │ • DevNet        │                    │ • Partner API   │                  │
+│  │ • control-plane │                    │ • Standalone    │                  │
+│  └─────────────────┘                    └─────────────────┘                  │
+│                                                                               │
+│  Backup Strategy                                                              │
+│  ═══════════════                                                              │
+│  • Daily automated backups to Google Drive                                   │
+│  • MainNet: 4 AM UTC (30-day retention)                                      │
+│  • TestNet: 3 AM UTC (14-day retention)                                      │
+│  • Website: 2 AM UTC (30-day retention)                                      │
+│                                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Remaining Items for Future
+
+1. **TestNet Fresh Deployment** - Namespace cleared, ready when needed
+2. **Private Container Registry** - For image distribution across nodes
+3. **Projector Heartbeat** - Code change for readiness check improvement
+4. **Phase 6: Testing & Validation** - Formal validation procedures
+5. **Phase 7: Monitoring & Operations** - Enhanced monitoring dashboards
+
+---
+
+*End of Work Record - December 13, 2025*
