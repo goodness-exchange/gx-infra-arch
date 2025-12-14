@@ -629,6 +629,46 @@ kubectl delete rs -n backend-mainnet \
 
 ---
 
+## Backup Cron Configuration (11:15 UTC)
+
+### Cron Schedule Configured
+
+```crontab
+# GX Infrastructure Backup Schedule
+# Full daily backup at 02:00 UTC
+0 2 * * * /root/backup-scripts/02-gx-full-backup.sh daily >> /root/backup-logs/daily-backup.log 2>&1
+
+# Weekly backup at 03:00 UTC on Sundays
+0 3 * * 0 /root/backup-scripts/02-gx-full-backup.sh weekly >> /root/backup-logs/weekly-backup.log 2>&1
+
+# Monthly backup at 04:00 UTC on 1st of month
+0 4 1 * * /root/backup-scripts/02-gx-full-backup.sh monthly >> /root/backup-logs/monthly-backup.log 2>&1
+```
+
+### Verification
+
+| Check | Status |
+|-------|--------|
+| Cron daemon (crond) | Active and running |
+| Crontab installed | Verified |
+| Logs directory | `/root/backup-logs/` exists |
+| Script executable | `/root/backup-scripts/02-gx-full-backup.sh` |
+
+### Disk Space Check
+
+| Node | Used | Available | Usage |
+|------|------|-----------|-------|
+| srv1089618 | 103G | 297G | 26% |
+| srv1089624 | 95G | 305G | 24% |
+| srv1092158 | 71G | 329G | 18% |
+| srv1117946 | 44G | 355G | 12% |
+
+**Google Drive**: 890 MB used (10 backup files)
+
+Tonight's backup (~14 MB) will complete without issues.
+
+---
+
 ## Next Steps
 
 1. ~~Review BACKUP_AUDIT_20251214.md and HA_DR_STRATEGY.md~~ - Completed
@@ -639,15 +679,16 @@ kubectl delete rs -n backend-mainnet \
 6. ~~Manual test 02:00 backup script~~ - Completed (13.34 MB uploaded)
 7. ~~Fix Redis/CouchDB authentication warnings~~ - Completed (14.08 MB uploaded)
 8. ~~Clean up orphaned crashing pods~~ - Completed (all deployments healthy)
-9. **Monitor** next scheduled backup (02:00 UTC tonight)
-10. **Consider** automated failover with Patroni or pg_auto_failover
-11. **Update** backend application to use read replicas for read-heavy queries
-12. **Investigate** why image 2.1.0 was built without `prisma generate`
-13. **Add monitoring** for cross-node connectivity
+9. ~~Configure backup cron schedule~~ - Completed (daily/weekly/monthly)
+10. **Monitor** next scheduled backup (02:00 UTC tonight)
+11. **Consider** automated failover with Patroni or pg_auto_failover
+12. **Update** backend application to use read replicas for read-heavy queries
+13. **Investigate** why image 2.1.0 was built without `prisma generate`
+14. **Add monitoring** for cross-node connectivity
 
 ---
 
-*Work completed: December 14, 2025 11:05 UTC*
+*Work completed: December 14, 2025 11:15 UTC*
 *Backup fixes applied and verified*
 *PostgreSQL streaming replication implemented and tested*
 *Failover procedure tested and validated (< 5 seconds)*
@@ -656,3 +697,4 @@ kubectl delete rs -n backend-mainnet \
 *Redis and CouchDB authentication fixes applied*
 *Cluster health restored - networking issue on srv1089618 fixed*
 *CoreDNS scaled to 3 replicas for redundancy*
+*Backup cron schedule configured (daily/weekly/monthly)*
