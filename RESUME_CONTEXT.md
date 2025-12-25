@@ -2,6 +2,7 @@
 
 ## Session Summary
 Deployed and configured messaging infrastructure across all environments (DevNet, TestNet, MainNet).
+Fixed mainnet network routing to allow ports 80/443 on VPS1-3.
 
 ## Current State
 
@@ -55,11 +56,27 @@ c62d335 docs: add Redis configuration verification for all environments
 5. ✅ Set up MinIO credentials as secrets
 6. ✅ Configure MinIO backups
 7. ✅ Add Prometheus monitoring and alerts
+8. ✅ Fix mainnet network routing (iptables DNAT for ports 80/443)
+
+### MainNet Network Routing
+Configured iptables DNAT rules on all mainnet nodes to route ports 80/443 to ingress controller:
+
+| Node | IP | Status |
+|------|-----|--------|
+| VPS1 | 72.60.210.201 | ✅ Configured |
+| VPS2 | 72.61.116.210 | ✅ Configured |
+| VPS3 | 72.61.81.3 | ✅ Configured |
+
+Ingress controller pod IP: 10.42.2.204 (runs on VPS3)
 
 ### Remaining Next Steps
-1. Monitor messaging service logs for any issues
-2. Configure Grafana dashboard for messaging metrics
-3. Consider off-cluster backup replication for disaster recovery
+1. **Add DNS A records in Cloudflare** for:
+   - wallet.gxcoin.money → 72.61.81.3 (or any VPS1-3)
+   - api.gxcoin.money → 72.61.81.3 (or any VPS1-3)
+2. Monitor messaging service logs for any issues
+3. Configure Grafana dashboard for messaging metrics
+4. Consider off-cluster backup replication for disaster recovery
+5. Consider script to auto-update DNAT rules if ingress pod IP changes
 
 ### Test Credentials (for browser testing)
 | Environment | Email | Password |
