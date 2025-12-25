@@ -1,0 +1,240 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gx-backend-ingress
+  namespace: backend-mainnet
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-staging
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Authorization, Content-Type, X-Idempotency-Key"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://gxcoin.money, https://www.gxcoin.money, https://wallet.gxcoin.money"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/forwarded-for-header: "CF-Connecting-IP"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "5"
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
+    # WebSocket Configuration
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$remote_addr"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - api.gxcoin.money
+    secretName: gx-api-tls
+  rules:
+  - host: api.gxcoin.money
+    http:
+      paths:
+      # Socket.io WebSocket endpoint
+      - backend:
+          service:
+            name: svc-messaging
+            port:
+              number: 80
+        path: /socket.io
+        pathType: Prefix
+      # Messaging service routes
+      - backend:
+          service:
+            name: svc-messaging
+            port:
+              number: 80
+        path: /api/v1/conversations
+        pathType: Prefix
+      - backend:
+          service:
+            name: svc-messaging
+            port:
+              number: 80
+        path: /api/v1/messages
+        pathType: Prefix
+      - backend:
+          service:
+            name: svc-messaging
+            port:
+              number: 80
+        path: /api/v1/files
+        pathType: Prefix
+      - backend:
+          service:
+            name: svc-messaging
+            port:
+              number: 80
+        path: /api/v1/voice
+        pathType: Prefix
+      - backend:
+          service:
+            name: svc-messaging
+            port:
+              number: 80
+        path: /api/v1/keys
+        pathType: Prefix
+      - backend:
+          service:
+            name: svc-messaging
+            port:
+              number: 80
+        path: /api/v1/groups
+        pathType: Prefix
+      # Identity service routes
+      - backend:
+          service:
+            name: svc-identity
+            port:
+              number: 3001
+        path: /api/v1/auth
+        pathType: Prefix
+      - backend:
+          service:
+            name: svc-identity
+            port:
+              number: 3001
+        path: /api/v1/users
+        pathType: Prefix
+      - backend:
+          service:
+            name: svc-identity
+            port:
+              number: 3001
+        path: /api/v1/registration
+        pathType: Prefix
+      - backend:
+          service:
+            name: svc-identity
+            port:
+              number: 3001
+        path: /api/v1/beneficiaries
+        pathType: Prefix
+      - backend:
+          service:
+            name: svc-identity
+            port:
+              number: 3001
+        path: /api/v1/relationships
+        pathType: Prefix
+      - backend:
+          service:
+            name: svc-identity
+            port:
+              number: 3001
+        path: /api/v1/documents
+        pathType: Prefix
+      - backend:
+          service:
+            name: svc-identity
+            port:
+              number: 3001
+        path: /api/v1/validation
+        pathType: Prefix
+      - backend:
+          service:
+            name: svc-identity
+            port:
+              number: 3001
+        path: /api/v1/notifications
+        pathType: Prefix
+      # Tokenomics service routes
+      - backend:
+          service:
+            name: svc-tokenomics
+            port:
+              number: 3003
+        path: /api/v1/wallets
+        pathType: Prefix
+      - backend:
+          service:
+            name: svc-tokenomics
+            port:
+              number: 3003
+        path: /api/v1/transactions
+        pathType: Prefix
+      - backend:
+          service:
+            name: svc-tokenomics
+            port:
+              number: 3003
+        path: /api/v1/balances
+        pathType: Prefix
+      - backend:
+          service:
+            name: svc-tokenomics
+            port:
+              number: 3003
+        path: /api/v1/transfers
+        pathType: Prefix
+      - backend:
+          service:
+            name: svc-tokenomics
+            port:
+              number: 3003
+        path: /api/v1/commands
+        pathType: Prefix
+      # Organization service
+      - backend:
+          service:
+            name: svc-organization
+            port:
+              number: 3004
+        path: /api/v1/organizations
+        pathType: Prefix
+      # Loanpool service
+      - backend:
+          service:
+            name: svc-loanpool
+            port:
+              number: 3005
+        path: /api/v1/loans
+        pathType: Prefix
+      # Governance service
+      - backend:
+          service:
+            name: svc-governance
+            port:
+              number: 3006
+        path: /api/v1/proposals
+        pathType: Prefix
+      - backend:
+          service:
+            name: svc-governance
+            port:
+              number: 3006
+        path: /api/v1/votes
+        pathType: Prefix
+      # Admin service
+      - backend:
+          service:
+            name: svc-admin
+            port:
+              number: 3002
+        path: /api/v1/admin
+        pathType: Prefix
+      # Tax service
+      - backend:
+          service:
+            name: svc-tax
+            port:
+              number: 3007
+        path: /api/v1/fees
+        pathType: Prefix
+      - backend:
+          service:
+            name: svc-tax
+            port:
+              number: 3007
+        path: /api/v1/velocity-tax
+        pathType: Prefix
+      # Health check
+      - backend:
+          service:
+            name: svc-identity
+            port:
+              number: 3001
+        path: /health
+        pathType: Exact
