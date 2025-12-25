@@ -1,0 +1,47 @@
+# svc-messaging Environment Configuration for MainNet
+#
+# This file documents the required environment variables for svc-messaging.
+# Apply with: kubectl set env deployment/svc-messaging -n backend-mainnet --env-file=<this-file>
+# Or patch the deployment directly.
+#
+# IMPORTANT: REDIS_URL must use the mainnet Redis password, not testnet!
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: svc-messaging-config
+  namespace: backend-mainnet
+data:
+  # Service ports
+  PORT: "3007"
+  MESSAGING_SERVICE_PORT: "3007"
+  WEBSOCKET_PORT: "3008"
+
+  # Master key (disabled for now)
+  MASTER_KEY_ENABLED: "false"
+
+  # S3/MinIO Configuration
+  S3_ENDPOINT: "http://minio.backend-mainnet.svc.cluster.local:9000"
+  S3_BUCKET_VOICE: "gx-voice-messages"
+  S3_REGION: "us-east-1"
+  S3_FORCE_PATH_STYLE: "true"
+
+---
+# Environment variables that should be set on the deployment
+# Use: kubectl set env deployment/svc-messaging -n backend-mainnet <VAR>=<VALUE>
+#
+# Required environment variables:
+#
+# REDIS_URL=redis://:XRCwgQQGOOH998HxD9XH24oJbjdHPPxl@redis-master.backend-mainnet.svc.cluster.local:6379
+#   - Must use mainnet Redis password (from backend-secrets REDIS_PASSWORD)
+#   - Do NOT use testnet password (Vqgag/j9zz6pb5mXSfSNY0C/Qt86zPojErs43Zq7vMA=)
+#
+# AWS_ACCESS_KEY_ID=gxmainnet
+#   - MinIO access key
+#
+# AWS_SECRET_ACCESS_KEY=<minio-password>
+#   - MinIO secret key (from minio-credentials secret)
+#
+# The deployment also inherits from:
+# - configMapRef: backend-config (REDIS_HOST, REDIS_PORT, etc.)
+# - secretRef: backend-secrets (DATABASE_URL, JWT_SECRET, etc.)

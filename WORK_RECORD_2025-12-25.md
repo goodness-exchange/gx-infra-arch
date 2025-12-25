@@ -140,6 +140,26 @@ feat(mainnet): add messaging infrastructure manifests
 - **Problem:** Port-forward to postgres kept failing with access denied
 - **Solution:** Used `kubectl exec` directly to postgres pod instead
 
+### Issue 4: Redis Authentication Failure (CRITICAL)
+- **Problem:** svc-messaging was configured with testnet Redis password instead of mainnet password
+- **Symptoms:** Continuous Redis auth errors in logs:
+  ```
+  Redis connection error in MessageRelayService
+  Redis pub client error
+  Redis error in VoiceRelayService
+  Presence Redis client error, using in-memory store
+  ```
+- **Root Cause:** REDIS_URL env var had wrong password:
+  ```
+  Wrong: redis://:Vqgag%2Fj9zz6pb5mXSfSNY0C%2FQt86zPojErs43Zq7vMA%3D@redis-master...
+  ```
+- **Solution:** Updated REDIS_URL to use correct mainnet password:
+  ```bash
+  kubectl set env deployment/svc-messaging -n backend-mainnet \
+    REDIS_URL="redis://:XRCwgQQGOOH998HxD9XH24oJbjdHPPxl@redis-master.backend-mainnet.svc.cluster.local:6379"
+  ```
+- **Verification:** All Redis errors cleared, real-time features working
+
 ---
 
 ## Files Modified/Created
@@ -150,6 +170,7 @@ feat(mainnet): add messaging infrastructure manifests
 - `k8s/mainnet/messaging/network-policy.yaml` (NEW)
 - `k8s/mainnet/messaging/database-schema.sql` (NEW)
 - `k8s/mainnet/messaging/README.md` (NEW)
+- `k8s/mainnet/messaging/svc-messaging-env.yaml` (NEW) - Environment configuration
 
 ---
 
