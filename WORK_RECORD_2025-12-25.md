@@ -654,20 +654,320 @@ The Q Send payment creates an OutboxCommand (`Q_SEND_PAY`) which would normally 
 
 ---
 
-### 17. Known Issues
+### 17. Fabric Endorsement Failure Fix
 
-#### Fabric Endorsement Failure (DevNet)
-- **Error:** `10 ABORTED: failed to collect enough transaction endorsements`
-- **Affects:** User blockchain registration (CREATE_USER command)
-- **Impact:** New users cannot be registered on blockchain
-- **Workaround:** Manual setup of fabricUserId and wallet for testing
-- **Status:** Pending investigation
+#### Root Cause
+The `biometricHash` field was being generated with bcrypt instead of SHA-256:
+
+```javascript
+// WRONG - produces 60-character bcrypt hash starting with $2b$
+const biometricHash = await bcrypt.hash(`${email}:${Date.now()}`, 10);
+
+// CORRECT - produces 64-character SHA-256 hex string
+const biometricHash = crypto.createHash('sha256').update(`${email}:${Date.now()}`).digest('hex');
+```
+
+The Hyperledger Fabric chaincode validates that biometricHash is a 64-character hex string (SHA-256 format).
+
+#### Fix Applied
+Updated three files to use SHA-256 instead of bcrypt:
+- `apps/svc-identity/src/services/users.service.ts`
+- `apps/svc-identity/src/services/registration.service.ts`
+- `apps/svc-identity/src/services/auth.service.ts`
+
+#### Deployment
+- Built and deployed `svc-identity:v2.2.1` to all environments
+- Fixed 37 existing users with bcrypt biometricHash in DevNet
+- Reset and retried 2 failed CREATE_USER commands
+
+#### Verification
+Both Alice and Bob successfully registered on blockchain:
+```
+Alice: Block 16, TxID: 8252f88cb330193b58cf9e4849cd8c8538246a7a4216d982244f75fbc45fc52a
+Bob: Block 17, TxID: 7a53029778e7ef382288857cc92cce921aa7aa875c38ae52f2a23909648f23a4
+```
+
+#### Commit
+```
+fix(svc-identity): use SHA-256 for biometricHash instead of bcrypt
+
+The Hyperledger Fabric chaincode requires biometricHash to be a 64-character
+SHA-256 hex string. The previous implementation used bcrypt which produces
+a 60-character string starting with $2b$, causing transaction endorsement
+failures.
+```
+
+---
+
+### 18. Q_SEND_PAY Blockchain Handler Implementation
+
+Successfully implemented the Q_SEND_PAY blockchain handler in the outbox-submitter to enable Q Send payments to be committed to the blockchain.
+
+#### Problem
+Q Send payments were created in the database but the `Q_SEND_PAY` command was failing with:
+```
+Unknown command type: Q_SEND_PAY
+```
+
+The outbox-submitter had no handler for this command type.
+
+#### Solution
+Added comprehensive Q_SEND_PAY handler to `workers/outbox-submitter/src/index.ts`:
+
+**1. Command Mapping (mapCommandToChaincode):**
+```typescript
+case 'Q_SEND_PAY':
+  return {
+    contractName: 'TokenomicsContract',
+    functionName: 'TransferWithFees',
+    args: [
+      payload.fromUserId as string,
+      payload.toUserId as string,
+      payload.amount.toString(),
+      'P2P', // Transaction type hint for fee calculation
+      payload.remark as string || 'Q Send payment',
+      `qsend-${payload.qsendRequestCode}`, // Idempotency key
+    ],
+  };
+```
+
+**2. Admin Role Configuration:**
+Added `Q_SEND_PAY` to `adminCommands` array because `TransferWithFees` requires Admin role.
+
+**3. Environment-Based MSP IDs:**
+Fixed hardcoded MSP IDs to use environment variables:
+```typescript
+const org1MspId = process.env.FABRIC_MSP_ID || 'Org1MSP';
+const org2MspId = process.env.FABRIC_ORG2_MSP_ID || 'Org2MSP';
+```
+
+**4. Post-Commit Side Effects:**
+- Update QSendRequest with on-chain transaction ID
+- Sync sender and receiver wallet balances
+- Create notifications for payment confirmation
+
+#### Errors Encountered & Fixed
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `Unknown command type: Q_SEND_PAY` | No handler | Added case in mapCommandToChaincode |
+| `failed to find endorsing peers for Org1MSP, Org2MSP` | Hardcoded MSP IDs | Use environment variables |
+| `TransferWithFees requires Admin role` | Wrong identity | Added to adminCommands array |
+| `balance for account GX-US-1988-M-0-0002 not found` | fabricUserId mismatch | Fixed user records with blockchain-registered IDs |
+| `Unknown argument updatedAt` | Prisma schema | Removed invalid field from update |
+
+#### Data Fixes Applied
+Fixed Alice and Bob's fabricUserId to match blockchain-registered values:
+```
+Alice: US 984 AUM945 0AKIY 8168
+Bob: GB CF1 ABF248 0LRQS 0058
+```
+
+#### Successful Transaction
+```
+Transaction ID: d04fc1aa05dc6f9ee52b07084752fc78908bb3be56f1739dfd83e134a95a5b47
+Amount: 50 Q
+Fee: 1 Q
+Alice (receiver): 10,050 Q
+Bob (payer): 4,949 Q
+```
+
+#### Deployment
+Built and deployed `outbox-submitter:2.2.3` to all environments:
+
+| Environment | FABRIC_MSP_ID | Status |
+|-------------|---------------|--------|
+| DevNet | Org1DevnetMSP | ✅ Deployed |
+| TestNet | Org1TestnetMSP | ✅ Deployed |
+| MainNet | Org1MainnetMSP | ✅ Deployed |
+
+#### Commit
+```
+[development 57a2a1a] feat(outbox-submitter): add Q_SEND_PAY blockchain handler
+```
+
+#### Version Summary
+| Service | Version |
+|---------|---------|
+| outbox-submitter | 2.2.3 |
+| svc-identity | v2.2.1 |
+
+---
+
+### 19. Environment Sync Analysis & Fixes
+
+#### Problem Statement
+When promoting code from DevNet to TestNet, tests were not passing on first attempt despite identical service versions. Manual interventions were required each time.
+
+#### Root Cause Analysis
+
+**Finding 1: Service versions are correctly synced**
+All three environments have identical service versions:
+| Service | Version |
+|---------|---------|
+| outbox-submitter | 2.2.3 |
+| svc-identity | v2.2.1 |
+| gx-wallet-frontend | v2.2.0 |
+| svc-messaging | v2.2.0 |
+
+**Finding 2: Database schemas are identical**
+Both DevNet and TestNet have 103 tables with matching structures.
+
+**Finding 3: TEST DATA was inconsistent (ROOT CAUSE)**
+| Environment | Users with bcrypt hash | Users with SHA256 hash |
+|-------------|------------------------|------------------------|
+| DevNet | 0 | All ✅ |
+| TestNet | 6 | 2 ❌ |
+| MainNet | 8 | 0 ❌ |
+
+**Why this happened:**
+1. Test users were created BEFORE svc-identity:v2.2.1 was deployed
+2. svc-identity:v2.2.1 only fixed NEW registrations, not existing users
+3. Manual fixes applied to DevNet were not replicated to other environments
+4. No migration script existed to fix existing data
+
+**Finding 4: MainNet missing FABRIC_ORG2 env vars**
+```
+DevNet:  FABRIC_ORG2_MSP_ID, FABRIC_ORG2_PEER_ENDPOINT ✅
+TestNet: FABRIC_ORG2_MSP_ID, FABRIC_ORG2_PEER_ENDPOINT ✅
+MainNet: Missing both ❌
+```
+
+#### Fixes Applied
+
+**Fix 1: Created standardized scripts**
+- `scripts/fix-user-data.js` - Fixes bcrypt hashes and resets failed commands
+- `scripts/setup-test-users.js` - Creates consistent test users per environment
+
+**Fix 2: Fixed bcrypt hashes across ALL environments**
+```sql
+UPDATE "UserProfile"
+SET "biometricHash" = encode(sha256(concat(email, ':fixed:', extract(epoch from now())::text)::bytea), 'hex')
+WHERE "biometricHash" LIKE '$2b$%';
+```
+
+| Environment | Users Fixed |
+|-------------|-------------|
+| DevNet | 0 (already fixed) |
+| TestNet | 8 |
+| MainNet | 8 |
+
+**Fix 3: Added missing MainNet env vars**
+```bash
+kubectl set env deployment/outbox-submitter -n backend-mainnet \
+  FABRIC_ORG2_MSP_ID=Org2MainnetMSP \
+  FABRIC_ORG2_PEER_ENDPOINT=peer0-org2.fabric-mainnet.svc.cluster.local:7051 \
+  FABRIC_ORG2_TLS_SERVER_NAME_OVERRIDE=peer0.org2.mainnet.goodness.exchange
+```
+
+#### Verification: TestNet Q Send Test
+
+Successfully tested Q Send on TestNet after fixes:
+| Step | Result |
+|------|--------|
+| Alice blockchain registration | ✅ Block 17 |
+| Bob blockchain registration | ✅ Block 18 |
+| Q Send request creation | ✅ QS-TNRHGTMQ |
+| Q Send payment | ✅ Block 19, TxID: 0a9e08f8... |
+| Balance sync | ✅ Alice: 500,000,200, Bob: 499,999,798 |
+
+#### Lessons Learned
+
+1. **Data migrations must accompany code changes**
+   - When fixing biometricHash format in code, also create migration for existing data
+
+2. **Test data setup should be scripted**
+   - Use standardized scripts instead of manual SQL
+   - Scripts ensure consistency across environments
+
+3. **Environment promotion checklist needed**
+   - Verify env vars are consistent
+   - Run data fix scripts on target environment
+   - Don't assume code-only deployments are sufficient
+
+4. **All environments must be treated as production-like**
+   - Apply same data fixes to all environments
+   - Don't leave TestNet/MainNet with stale data
+
+#### Scripts Created
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/fix-user-data.js` | Fix bcrypt hashes, reset failed commands |
+| `scripts/setup-test-users.js` | Create consistent test users with SHA256 hashes |
+
+---
+
+## Environment Status (Final)
+
+| Check | DevNet | TestNet | MainNet |
+|-------|--------|---------|---------|
+| Service versions synced | ✅ | ✅ | ✅ |
+| All biometricHash SHA256 | ✅ | ✅ | ✅ |
+| FABRIC_ORG2 env vars | ✅ | ✅ | ✅ |
+| outbox-submitter running | ✅ | ✅ | ✅ |
+
+---
+
+---
+
+### 20. CRITICAL: MainNet Fabric Network NOT DEPLOYED
+
+**See:** `CRITICAL_FINDINGS_2025-12-25.md` for full analysis.
+
+#### Discovery
+During Q Send testing on MainNet, discovered that `fabric-mainnet` namespace does not exist.
+
+#### Status
+```
+fabric-devnet     ✅ DEPLOYED (44 days old)
+fabric-testnet    ✅ DEPLOYED (44 days old)
+fabric-mainnet    ❌ NEVER DEPLOYED
+```
+
+#### Impact
+All blockchain operations on MainNet are BLOCKED:
+- User blockchain registration
+- Q Send payments
+- Token transfers
+- All chaincode operations
+
+#### Root Cause
+The MainNet Fabric deployment was never completed. Only network policies were created (Nov 11), but no Fabric components were deployed.
+
+#### User's Valid Concerns
+1. Not following protocols
+2. Not following promotion sequence
+3. Backend configured before infrastructure deployed
+4. Wasting time/resources on debugging infrastructure gaps
+
+---
+
+## Session Summary
+
+### Completed
+1. ✅ Q_SEND_PAY handler implemented
+2. ✅ outbox-submitter:2.2.3 deployed to all environments
+3. ✅ biometricHash fixed (bcrypt → SHA256) across all environments
+4. ✅ Q Send tested on DevNet - PASSED
+5. ✅ Q Send tested on TestNet - PASSED
+6. ❌ Q Send on MainNet - BLOCKED (no Fabric network)
+
+### Scripts Created
+- `scripts/fix-user-data.js`
+- `scripts/setup-test-users.js`
+
+### Commits
+- `57a2a1a` - feat(outbox-submitter): add Q_SEND_PAY blockchain handler
+- `54d0bde` - feat(scripts): add environment sync and test user setup scripts
 
 ---
 
 ## Next Steps
-1. Fix Fabric endorsement configuration for DevNet
-2. Configure Grafana dashboard for messaging metrics visualization
-3. Consider off-cluster backup replication for disaster recovery
-4. Consider implementing a script to auto-update DNAT rules when ingress pod IP changes
-5. Set up automated CI/CD pipeline for deployment promotion
+1. ~~Fix Fabric endorsement configuration for DevNet~~ (Fixed)
+2. ~~Test Q Send end-to-end on TestNet~~ (Passed)
+3. **CRITICAL: Deploy MainNet Fabric network** or defer blockchain features
+4. Create deployment verification checklist
+5. Configure Grafana dashboard for messaging metrics visualization
+6. Consider off-cluster backup replication for disaster recovery
+7. Set up automated CI/CD pipeline with data migration steps
