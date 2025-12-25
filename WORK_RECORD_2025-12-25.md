@@ -254,9 +254,56 @@ MainNet: ✅ 174 B backed up (3 files)
 - MainNet: PVC quota increased from 10 to 15
 - DevNet: PVC quota increased from 3 to 5
 
+### 9. Messaging Service Monitoring Setup
+
+Configured Prometheus monitoring and alerting for svc-messaging and MinIO:
+
+#### Prometheus Scraping
+Added annotations to svc-messaging deployments in all environments:
+```yaml
+prometheus.io/scrape: "true"
+prometheus.io/port: "3007"
+prometheus.io/path: "/metrics"
+```
+
+| Environment | Target Status |
+|-------------|---------------|
+| DevNet | ✅ up |
+| TestNet | ✅ up |
+| MainNet | ✅ up (2 replicas) |
+
+#### Alert Rules Created (16 total)
+
+**Messaging Service Alerts:**
+- `MessagingServiceDown` - Service unavailable (critical)
+- `MessagingHighErrorRate` - >5% 5xx errors (warning)
+- `MessagingCriticalErrorRate` - >20% 5xx errors (critical)
+- `MessagingSlowResponseTime` - P95 >500ms (warning)
+- `MessagingVerySlowResponseTime` - P95 >2s (critical)
+- `MessagingWebSocketConnectionsHigh` - >1000 connections (warning)
+- `MessagingRedisDisconnected` - Lost Redis connection (critical)
+- `MessagingS3UploadFailures` - File upload failures (warning)
+- `MessagingPodRestartLoop` - Frequent restarts (warning)
+- `MessagingHighMemoryUsage` - >85% memory (warning)
+- `MessagingHighCPUUsage` - >80% CPU (warning)
+- `MessagingNoActivity` - No requests for 30min (info)
+
+**MinIO Alerts:**
+- `MinIOServiceDown` - MinIO unavailable (critical)
+- `MinIOBackupFailed` - Backup job failed (warning)
+- `MinIOStorageNearlyFull` - >80% storage used (warning)
+- `MinIOStorageCriticallyFull` - >95% storage used (critical)
+
+#### NetworkPolicy Updates
+- MainNet: Added port 3007 to `allow-monitoring` policy
+- TestNet: Added port 3007 to `allow-internal-backend` policy
+
+#### Files Created
+- `k8s/mainnet/messaging/monitoring-alerts.yaml` - Alert rules reference
+
 ---
 
 ## Next Steps
 1. Monitor messaging service logs for any issues
-2. Add monitoring/alerting for messaging service
+2. Configure Grafana dashboard for messaging metrics visualization
 3. Consider off-cluster backup replication for disaster recovery

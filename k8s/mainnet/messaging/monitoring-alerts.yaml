@@ -1,0 +1,223 @@
+# Messaging Service Monitoring Alerts
+# These alerts are added to the prometheus-backend-alerts ConfigMap
+#
+# To apply: kubectl apply -f monitoring-alerts.yaml
+# Note: This is a reference file. Actual alerts are added to existing ConfigMap.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-messaging-alerts
+  namespace: monitoring
+  labels:
+    app: prometheus
+    component: alerts
+data:
+  messaging-alerts.yml: |
+    groups:
+    - name: messaging_service_alerts
+      interval: 30s
+      rules:
+
+      # Messaging Service Down
+      - alert: MessagingServiceDown
+        expr: |
+          absent(up{app="svc-messaging"}) == 1
+          or sum(up{app="svc-messaging"}) == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: messaging
+        annotations:
+          summary: "Messaging service is down"
+          description: "svc-messaging in namespace {{ $labels.kubernetes_namespace }} is not responding"
+
+      # High Error Rate
+      - alert: MessagingHighErrorRate
+        expr: |
+          (sum(rate(http_http_requests_total{app="svc-messaging",status=~"5.*"}[5m])) /
+           sum(rate(http_http_requests_total{app="svc-messaging"}[5m]))) * 100 > 5
+        for: 3m
+        labels:
+          severity: warning
+          service: messaging
+        annotations:
+          summary: "Messaging service high error rate"
+          description: "{{ $value | humanizePercentage }} of requests returning 5xx errors"
+
+      - alert: MessagingCriticalErrorRate
+        expr: |
+          (sum(rate(http_http_requests_total{app="svc-messaging",status=~"5.*"}[5m])) /
+           sum(rate(http_http_requests_total{app="svc-messaging"}[5m]))) * 100 > 20
+        for: 1m
+        labels:
+          severity: critical
+          service: messaging
+        annotations:
+          summary: "CRITICAL: Messaging service error rate critical"
+          description: "{{ $value | humanizePercentage }} of requests returning 5xx errors - immediate action required"
+
+      # Slow Response Time
+      - alert: MessagingSlowResponseTime
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_http_request_duration_seconds_bucket{app="svc-messaging"}[5m])) by (le)) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: messaging
+        annotations:
+          summary: "Messaging service response time slow"
+          description: "P95 response time is {{ $value | humanizeDuration }}"
+
+      - alert: MessagingVerySlowResponseTime
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_http_request_duration_seconds_bucket{app="svc-messaging"}[5m])) by (le)) > 2
+        for: 2m
+        labels:
+          severity: critical
+          service: messaging
+        annotations:
+          summary: "CRITICAL: Messaging service response time very slow"
+          description: "P95 response time is {{ $value | humanizeDuration }} - immediate action required"
+
+      # WebSocket Connection Issues
+      - alert: MessagingWebSocketConnectionsHigh
+        expr: |
+          sum(socket_io_connected_sockets{app="svc-messaging"}) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          service: messaging
+        annotations:
+          summary: "High number of WebSocket connections"
+          description: "{{ $value }} active WebSocket connections"
+
+      # Redis Connection Issues
+      - alert: MessagingRedisDisconnected
+        expr: |
+          messaging_redis_connected{app="svc-messaging"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: messaging
+        annotations:
+          summary: "Messaging service Redis disconnected"
+          description: "svc-messaging lost connection to Redis in namespace {{ $labels.kubernetes_namespace }}"
+
+      # MinIO/S3 Storage Issues
+      - alert: MessagingS3UploadFailures
+        expr: |
+          rate(messaging_s3_upload_failures_total{app="svc-messaging"}[5m]) > 0.1
+        for: 3m
+        labels:
+          severity: warning
+          service: messaging
+        annotations:
+          summary: "File upload failures detected"
+          description: "{{ $value }} upload failures per second"
+
+      # Pod Restart Loop
+      - alert: MessagingPodRestartLoop
+        expr: |
+          rate(kube_pod_container_status_restarts_total{container="svc-messaging"}[15m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: messaging
+        annotations:
+          summary: "Messaging pod restarting frequently"
+          description: "Pod {{ $labels.pod }} restarting {{ $value }} times per minute"
+
+      # High Memory Usage
+      - alert: MessagingHighMemoryUsage
+        expr: |
+          (container_memory_working_set_bytes{container="svc-messaging"} /
+           container_spec_memory_limit_bytes{container="svc-messaging"}) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: messaging
+        annotations:
+          summary: "Messaging pod memory usage high"
+          description: "Pod {{ $labels.pod }} using {{ $value }}% memory"
+
+      # High CPU Usage
+      - alert: MessagingHighCPUUsage
+        expr: |
+          (sum(rate(container_cpu_usage_seconds_total{container="svc-messaging"}[5m])) by (pod) /
+           sum(container_spec_cpu_quota{container="svc-messaging"} / container_spec_cpu_period{container="svc-messaging"}) by (pod)) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: messaging
+        annotations:
+          summary: "Messaging pod CPU usage high"
+          description: "Pod {{ $labels.pod }} using {{ $value }}% CPU"
+
+      # No Messages Processed (potential issue indicator)
+      - alert: MessagingNoActivity
+        expr: |
+          sum(rate(http_http_requests_total{app="svc-messaging",route!="/health",route!="/metrics"}[30m])) == 0
+        for: 30m
+        labels:
+          severity: info
+          service: messaging
+        annotations:
+          summary: "No messaging activity detected"
+          description: "No API requests (excluding health checks) in the last 30 minutes"
+
+    - name: messaging_minio_alerts
+      interval: 60s
+      rules:
+
+      # MinIO Service Down
+      - alert: MinIOServiceDown
+        expr: |
+          absent(up{app="minio"}) == 1
+          or sum(up{app="minio"}) == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: minio
+        annotations:
+          summary: "MinIO storage service is down"
+          description: "MinIO in namespace {{ $labels.kubernetes_namespace }} is not responding"
+
+      # MinIO Backup Failed
+      - alert: MinIOBackupFailed
+        expr: |
+          kube_job_failed{job_name=~"minio-backup.*"} > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: minio
+        annotations:
+          summary: "MinIO backup job failed"
+          description: "Backup job {{ $labels.job_name }} failed in namespace {{ $labels.namespace }}"
+
+      # MinIO PVC Nearly Full
+      - alert: MinIOStorageNearlyFull
+        expr: |
+          (kubelet_volume_stats_used_bytes{persistentvolumeclaim=~"minio.*"} /
+           kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~"minio.*"}) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+          service: minio
+        annotations:
+          summary: "MinIO storage nearly full"
+          description: "PVC {{ $labels.persistentvolumeclaim }} is {{ $value }}% full"
+
+      - alert: MinIOStorageCriticallyFull
+        expr: |
+          (kubelet_volume_stats_used_bytes{persistentvolumeclaim=~"minio.*"} /
+           kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~"minio.*"}) * 100 > 95
+        for: 5m
+        labels:
+          severity: critical
+          service: minio
+        annotations:
+          summary: "CRITICAL: MinIO storage critically full"
+          description: "PVC {{ $labels.persistentvolumeclaim }} is {{ $value }}% full - immediate action required"
