@@ -59,6 +59,7 @@ c62d335 docs: add Redis configuration verification for all environments
 8. ✅ Fix mainnet network routing (iptables DNAT for ports 80/443)
 9. ✅ Add Cloudflare DNS A records (wallet.gxcoin.money, api.gxcoin.money)
 10. ✅ Fix NEXTAUTH_SECRET missing on mainnet frontend
+11. ✅ Fix login "Invalid Credentials" error (internal K8s routing for NextAuth)
 
 ### MainNet Network Routing
 Configured iptables DNAT rules on all mainnet nodes to route ports 80/443 to ingress controller:

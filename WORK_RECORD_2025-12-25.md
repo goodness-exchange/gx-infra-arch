@@ -399,6 +399,52 @@ kubectl set env deployment/gx-wallet-frontend -n backend-mainnet \
 
 ---
 
+### 13. MainNet Frontend Login Fix (Internal K8s Routing)
+
+Fixed "Invalid Credentials" error caused by frontend pod trying to connect to external Cloudflare IP.
+
+#### Problem
+- Login failed with "Invalid Credentials" error
+- Backend API worked correctly (verified with direct curl)
+- Frontend logs showed: `connect ECONNREFUSED 104.21.20.20:443`
+- Root cause: NextAuth authorize callback used `NEXT_PUBLIC_API_URL` which was baked into Docker image at build time, pointing to `https://api.gxcoin.money`
+- From inside the K8s cluster, this resolved to Cloudflare's IP which wasn't reachable
+
+#### Solution
+1. Modified `app/api/auth/[...nextauth]/route.ts` to use server-side environment variable:
+```typescript
+// Before
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.gxcoin.money';
+
+// After
+const apiUrl = process.env.IDENTITY_API_URL || process.env.NEXT_PUBLIC_API_URL || 'https://api.gxcoin.money';
+```
+
+2. Set runtime environment variables on deployment:
+```bash
+kubectl set env deployment/gx-wallet-frontend -n backend-mainnet \
+  IDENTITY_API_URL="http://svc-identity.backend-mainnet.svc.cluster.local:3001" \
+  TOKENOMICS_API_URL="http://svc-tokenomics.backend-mainnet.svc.cluster.local:3003"
+```
+
+3. Rebuilt and deployed frontend with tag `mainnet-auth-fix`
+
+#### Commit
+```
+fix(auth): use server-side IDENTITY_API_URL for internal K8s routing
+
+The NextAuth authorize callback was using NEXT_PUBLIC_API_URL which gets baked
+into the Docker image at build time. This caused the frontend pod to try
+connecting to api.gxcoin.money via Cloudflare (external IP) instead of using
+internal Kubernetes service routing.
+```
+
+#### Verification
+- Login successful via browser
+- Users can access dashboard after login
+
+---
+
 ## Next Steps
 1. Monitor messaging service logs for any issues
 2. Configure Grafana dashboard for messaging metrics visualization
