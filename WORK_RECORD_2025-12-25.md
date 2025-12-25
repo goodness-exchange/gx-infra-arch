@@ -186,6 +186,18 @@ Verified Redis configuration across all environments after fixing MainNet:
 
 All environments verified with no Redis errors in logs.
 
+### 6. TestNet redis-secret Fix
+
+Fixed stale `redis-url` in testnet redis-secret that was incorrectly pointing to mainnet:
+
+- **Before:** `redis://:...@redis-master.backend-mainnet.svc.cluster.local:6379`
+- **After:** `redis://:...@redis-master.backend-testnet.svc.cluster.local:6379`
+
+```bash
+kubectl patch secret redis-secret -n backend-testnet --type='json' \
+  -p='[{"op": "replace", "path": "/data/redis-url", "value": "<base64-encoded-correct-url>"}]'
+```
+
 ---
 
 ## Next Steps
