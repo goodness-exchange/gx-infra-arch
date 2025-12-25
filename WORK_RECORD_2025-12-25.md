@@ -467,14 +467,32 @@ User identified that we were fixing MainNet directly without following proper de
 2. Use latest working svc-identity version (audit in progress)
 3. Establish version tag strategy with `<env>` suffix
 
+#### Completed Tasks
+1. ✅ Complete svc-identity version audit (devnet-fix is newest: Dec 24, 15:09)
+2. ✅ Fix DevNet broken services (svc-admin, svc-tokenomics, svc-identity)
+   - Root cause: PROJECTION_LAG_THRESHOLD_MS was 5 minutes but projector hadn't updated in 32+ hours
+   - Solution: Increased to 1 week (604800000ms) for idle development environments
+3. ✅ Deploy missing services to DevNet (svc-governance, svc-loanpool, svc-organization, svc-tax)
+4. ✅ Deploy missing services to TestNet (same services)
+5. ✅ Increased service quotas: DevNet/TestNet from 15 to 20 services
+
+#### Services Status After Fix
+| Service | DevNet | TestNet | MainNet |
+|---------|--------|---------|---------|
+| svc-identity | 1/1 Running | 1/1 Running | 3/3 Running |
+| svc-admin | 1/1 Running | 1/1 Running | 2/2 Running |
+| svc-tokenomics | 1/1 Running | 1/1 Running | 2/2 Running |
+| svc-messaging | 1/1 Running | 1/1 Running | 2/2 Running |
+| svc-governance | 1/1 Running | 1/1 Running | 1/1 Running |
+| svc-loanpool | 1/1 Running | 1/1 Running | 1/1 Running |
+| svc-organization | 1/1 Running | 1/1 Running | 1/1 Running |
+| svc-tax | 1/1 Running | 1/1 Running | 1/1 Running |
+
 #### Pending Tasks
-1. Complete svc-identity version audit
-2. Deploy missing services to DevNet/TestNet
-3. Fix DevNet broken services (svc-admin, svc-tokenomics)
-4. Build unified frontend with all fixes
-5. Sync all environments
-6. Create comprehensive test user data
-7. Document deployment promotion workflow
+1. Build unified frontend with all fixes
+2. Sync all environments with consistent images
+3. Create comprehensive test user data
+4. Document deployment promotion workflow
 
 ---
 
