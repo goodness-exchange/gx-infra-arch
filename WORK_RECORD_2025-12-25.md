@@ -221,9 +221,42 @@ Created proper Kubernetes secrets for MinIO credentials across all environments:
 - All services rolled out successfully
 - Health checks passing on all environments
 
+### 8. MinIO Backup Configuration
+
+Configured automated backups for MinIO S3 storage across all environments:
+
+#### Backup Schedule
+| Environment | Schedule | Retention | Storage |
+|-------------|----------|-----------|---------|
+| DevNet | Every 6h (:30) | 7 days | 10Gi PVC |
+| TestNet | Every 6h (:15) | 7 days | 10Gi PVC |
+| MainNet | Every 6h (:00) | 7 days | 50Gi PVC |
+
+#### Components Created
+- `minio-backup-pvc` - Persistent volume for backup storage
+- `minio-backup-scripts` ConfigMap - Backup script using `mc mirror`
+- `minio-backup` CronJob - Scheduled backup job
+
+#### Backup Process
+1. Configures MinIO client with credentials from `minio-credentials` secret
+2. Mirrors all buckets to timestamped backup directory
+3. Creates metadata.json with file listing
+4. Cleans up backups older than 7 days
+
+#### Test Results
+```
+DevNet:  ✅ 183 B backed up (3 files)
+TestNet: ✅ 54 B backed up (1 file)
+MainNet: ✅ 174 B backed up (3 files)
+```
+
+#### Quota Updates
+- MainNet: PVC quota increased from 10 to 15
+- DevNet: PVC quota increased from 3 to 5
+
 ---
 
 ## Next Steps
 1. Monitor messaging service logs for any issues
-2. Configure backup for MinIO data
-3. Add monitoring/alerting for messaging service
+2. Add monitoring/alerting for messaging service
+3. Consider off-cluster backup replication for disaster recovery

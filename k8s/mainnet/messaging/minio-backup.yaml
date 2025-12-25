@@ -1,0 +1,141 @@
+# MinIO Backup Infrastructure for MainNet
+# Runs every 6 hours, retains 7 days of backups
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minio-backup-pvc
+  namespace: backend-mainnet
+  labels:
+    app: minio
+    component: backup
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 50Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: minio-backup-scripts
+  namespace: backend-mainnet
+  labels:
+    app: minio
+    component: backup
+data:
+  backup.sh: |
+    #!/bin/sh
+    set -e
+
+    BACKUP_DIR="/backups"
+    DATE=$(date +%Y%m%d_%H%M%S)
+    BACKUP_NAME="minio_backup_${DATE}"
+    RETENTION_DAYS=7
+
+    echo "=== MinIO Backup Started: $(date) ==="
+
+    # Configure mc client
+    echo "Configuring MinIO client..."
+    mc alias set minio http://minio.backend-mainnet.svc.cluster.local:9000 \
+      "${MINIO_ROOT_USER}" "${MINIO_ROOT_PASSWORD}" --api S3v4
+
+    # Create backup directory
+    mkdir -p "${BACKUP_DIR}/${BACKUP_NAME}"
+
+    # Mirror all buckets to backup location
+    echo "Mirroring buckets..."
+    mc mirror --preserve minio/ "${BACKUP_DIR}/${BACKUP_NAME}/" 2>&1 || {
+      echo "Warning: Mirror completed with some errors"
+    }
+
+    # Create metadata file
+    echo "Creating metadata..."
+    mc ls minio/ --recursive --json > "${BACKUP_DIR}/${BACKUP_NAME}/metadata.json" 2>/dev/null || true
+
+    # Get backup size
+    BACKUP_SIZE=$(du -sh "${BACKUP_DIR}/${BACKUP_NAME}" | cut -f1)
+    echo "Backup size: ${BACKUP_SIZE}"
+
+    # Create completion marker
+    echo "{\"timestamp\": \"$(date -Iseconds)\", \"size\": \"${BACKUP_SIZE}\", \"status\": \"complete\"}" \
+      > "${BACKUP_DIR}/${BACKUP_NAME}/backup.info"
+
+    # Cleanup old backups
+    echo "Cleaning up backups older than ${RETENTION_DAYS} days..."
+    find "${BACKUP_DIR}" -maxdepth 1 -type d -name "minio_backup_*" -mtime +${RETENTION_DAYS} -exec rm -rf {} \; 2>/dev/null || true
+
+    # List remaining backups
+    echo "=== Current Backups ==="
+    ls -la "${BACKUP_DIR}" | grep minio_backup || echo "No backups found"
+
+    # Show disk usage
+    echo "=== Backup Storage Usage ==="
+    df -h "${BACKUP_DIR}"
+
+    echo "=== MinIO Backup Completed: $(date) ==="
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: minio-backup
+  namespace: backend-mainnet
+  labels:
+    app: minio
+    component: backup
+spec:
+  schedule: "0 */6 * * *"  # Every 6 hours
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    metadata:
+      labels:
+        app: minio-backup
+        component: backup
+    spec:
+      template:
+        metadata:
+          labels:
+            app: minio-backup
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: minio-backup
+              image: minio/mc:latest
+              command: ["/bin/sh", "/scripts/backup.sh"]
+              env:
+                - name: MINIO_ROOT_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: minio-credentials
+                      key: MINIO_ROOT_USER
+                - name: MINIO_ROOT_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: minio-credentials
+                      key: MINIO_ROOT_PASSWORD
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+              # Note: minimum requests of 100m CPU and 128Mi memory may be
+              # required by LimitRange policies in some namespaces
+              volumeMounts:
+                - name: backup-scripts
+                  mountPath: /scripts
+                - name: backup-storage
+                  mountPath: /backups
+          volumes:
+            - name: backup-scripts
+              configMap:
+                name: minio-backup-scripts
+                defaultMode: 0755
+            - name: backup-storage
+              persistentVolumeClaim:
+                claimName: minio-backup-pvc
