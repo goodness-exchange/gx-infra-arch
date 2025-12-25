@@ -174,6 +174,20 @@ feat(mainnet): add messaging infrastructure manifests
 
 ---
 
+### 5. Redis Configuration Verification (All Environments)
+
+Verified Redis configuration across all environments after fixing MainNet:
+
+| Environment | Redis Password Secret | svc-messaging REDIS_URL | Status |
+|------------|----------------------|------------------------|--------|
+| DevNet | redis-secret.REDIS_PASSWORD = `RedisDevnet2025` | `redis://:RedisDevnet2025@redis-master.backend-devnet...` | ✅ Correct |
+| TestNet | redis-secret.password = `Vqgag/j9...` | `redis://:Vqgag%2F...@redis-master.backend-testnet...` | ✅ Correct |
+| MainNet | redis-credentials.REDIS_PASSWORD = `XRCwgQQGOOH998...` | `redis://:XRCwgQQGOOH998...@redis-master.backend-mainnet...` | ✅ Correct (Fixed) |
+
+All environments verified with no Redis errors in logs.
+
+---
+
 ## Next Steps
 1. Monitor messaging service logs for any issues
 2. Set up proper MinIO credentials secret (currently hardcoded)
