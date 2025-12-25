@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ssh root@72.61.116.210 'journalctl -u k3s --since \"\"1 minute ago\"\" --no-pager | grep -E \"\"(level=error|level=fatal|Error|error)\"\" | tail -10')",
+      "Bash(ssh:*)",
+      "Bash(cat:*)",
+      "Bash(ls:*)",
+      "Bash(kubectl get:*)",
+      "Bash(kubectl logs:*)",
+      "Bash(kubectl exec:*)",
+      "Bash(kubectl rollout:*)",
+      "Bash(kubectl describe:*)",
+      "Bash(kubectl delete:*)",
+      "Bash(kubectl patch:*)",
+      "Bash(kubectl scale:*)",
+      "Bash(docker build:*)",
+      "Bash(kubectl set image:*)",
+      "Bash(systemctl restart:*)"
+    ]
+  }
+}

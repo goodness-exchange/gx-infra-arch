@@ -57,6 +57,8 @@ c62d335 docs: add Redis configuration verification for all environments
 6. ✅ Configure MinIO backups
 7. ✅ Add Prometheus monitoring and alerts
 8. ✅ Fix mainnet network routing (iptables DNAT for ports 80/443)
+9. ✅ Add Cloudflare DNS A records (wallet.gxcoin.money, api.gxcoin.money)
+10. ✅ Fix NEXTAUTH_SECRET missing on mainnet frontend
 
 ### MainNet Network Routing
 Configured iptables DNAT rules on all mainnet nodes to route ports 80/443 to ingress controller:
@@ -69,14 +71,19 @@ Configured iptables DNAT rules on all mainnet nodes to route ports 80/443 to ing
 
 Ingress controller pod IP: 10.42.2.204 (runs on VPS3)
 
+### Cloudflare DNS Configuration (Completed)
+| Domain | IP | Environment |
+|--------|-----|-------------|
+| wallet.gxcoin.money | 72.61.81.3 | MainNet |
+| api.gxcoin.money | 72.60.210.201, 72.61.116.210, 72.61.81.3 | MainNet |
+| devnet.gxcoin.money | 217.196.51.190 | DevNet |
+| testnet.gxcoin.money | 217.196.51.190 | TestNet |
+
 ### Remaining Next Steps
-1. **Add DNS A records in Cloudflare** for:
-   - wallet.gxcoin.money → 72.61.81.3 (or any VPS1-3)
-   - api.gxcoin.money → 72.61.81.3 (or any VPS1-3)
-2. Monitor messaging service logs for any issues
-3. Configure Grafana dashboard for messaging metrics
-4. Consider off-cluster backup replication for disaster recovery
-5. Consider script to auto-update DNAT rules if ingress pod IP changes
+1. Monitor messaging service logs for any issues
+2. Configure Grafana dashboard for messaging metrics
+3. Consider off-cluster backup replication for disaster recovery
+4. Consider script to auto-update DNAT rules if ingress pod IP changes
 
 ### Test Credentials (for browser testing)
 | Environment | Email | Password |

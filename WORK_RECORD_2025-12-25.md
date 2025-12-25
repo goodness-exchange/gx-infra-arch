@@ -356,9 +356,51 @@ The DNAT rules point to the ingress controller pod IP (10.42.2.204). If the ingr
 
 ---
 
+### 11. Cloudflare DNS Configuration
+
+Added and updated DNS A records via Cloudflare API.
+
+#### Records Added/Updated
+| Domain | IP | Action |
+|--------|-----|--------|
+| wallet.gxcoin.money | 72.61.81.3 | Added |
+| api.gxcoin.money | 72.61.116.210 | Updated (was 217.196.51.190) |
+
+#### Final DNS Configuration
+| Domain | IP(s) | Environment |
+|--------|-------|-------------|
+| wallet.gxcoin.money | 72.61.81.3 | MainNet |
+| api.gxcoin.money | 72.60.210.201, 72.61.116.210, 72.61.81.3 | MainNet (3 records) |
+| devnet.gxcoin.money | 217.196.51.190 | DevNet |
+| testnet.gxcoin.money | 217.196.51.190 | TestNet |
+
+All domains proxied through Cloudflare.
+
+---
+
+### 12. MainNet Frontend NEXTAUTH_SECRET Fix
+
+Fixed "Server error" on wallet.gxcoin.money caused by missing NextAuth configuration.
+
+#### Problem
+- Browser showed "Server error - There is a problem with the server configuration"
+- Logs showed: `[next-auth][error][NO_SECRET] Please define a secret in production`
+
+#### Solution
+```bash
+kubectl set env deployment/gx-wallet-frontend -n backend-mainnet \
+  NEXTAUTH_SECRET="<generated-secret>" \
+  NEXTAUTH_URL="https://wallet.gxcoin.money"
+```
+
+#### Verification
+- HTTP 200 response from wallet.gxcoin.money
+- No more NO_SECRET errors in logs
+
+---
+
 ## Next Steps
-1. Add DNS A records in Cloudflare for wallet.gxcoin.money and api.gxcoin.money
-2. Monitor messaging service logs for any issues
-3. Configure Grafana dashboard for messaging metrics visualization
-4. Consider off-cluster backup replication for disaster recovery
-5. Consider implementing a script to auto-update DNAT rules when ingress pod IP changes
+1. Monitor messaging service logs for any issues
+2. Configure Grafana dashboard for messaging metrics visualization
+3. Consider off-cluster backup replication for disaster recovery
+4. Consider implementing a script to auto-update DNAT rules when ingress pod IP changes
