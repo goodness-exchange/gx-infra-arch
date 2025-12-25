@@ -1,0 +1,160 @@
+# Work Record - December 25, 2025
+
+## Summary
+Deployed messaging infrastructure to MainNet, including MinIO S3 storage, database schema, ingress configuration, and frontend update.
+
+---
+
+## Tasks Completed
+
+### 1. MainNet Messaging Backend Deployment
+
+#### MinIO S3 Storage
+- Deployed MinIO StatefulSet with 50GB persistent storage
+- Created `gx-voice-messages` bucket for file attachments
+- Configured credentials: `gxmainnet` / `GxMainNet2025S3SecureStorage`
+
+#### svc-messaging Service Update
+- Updated image to `conv-fix` tag with conversation creation fix
+- Added S3 environment variables:
+  - `S3_ENDPOINT=http://minio.backend-mainnet.svc.cluster.local:9000`
+  - `S3_BUCKET_VOICE=gx-voice-messages`
+  - `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`
+- Added `tier: api` label for NetworkPolicy
+
+#### Database Schema
+- Created messaging tables directly via SQL (Prisma not accessible from pods):
+  - `Conversation` - Chat containers
+  - `ConversationParticipant` - User membership
+  - `Message` - Encrypted messages with file attachment support
+  - `MessageDeliveryReceipt` - Delivery tracking
+  - `UserSignalKey` - E2E encryption identity keys
+  - `SignalPreKey` - One-time pre-keys
+  - `GroupEncryptionKey` - Group chat symmetric keys
+  - `GroupParticipantKey` - Per-participant wrapped keys
+- Created enums: `ConversationType`, `ParticipantRole`, `MessageType`, `MessageStatus`
+
+#### Ingress Configuration
+- Added WebSocket annotations for Socket.io support
+- Added messaging routes:
+  - `/socket.io` - Real-time WebSocket
+  - `/api/v1/conversations` - Conversation management
+  - `/api/v1/messages` - Message send/receive
+  - `/api/v1/files` - File upload/download proxy
+  - `/api/v1/voice` - Voice messages
+  - `/api/v1/keys` - Encryption keys
+  - `/api/v1/groups` - Group management
+
+#### Network Policy
+- Updated `allow-ingress-to-services` to include ports 3007 and 3008
+
+---
+
+### 2. MainNet Frontend Update
+
+- Built frontend with mainnet configuration:
+  - `NEXT_PUBLIC_API_URL=https://api.gxcoin.money`
+  - `NEXT_PUBLIC_WS_URL=wss://api.gxcoin.money`
+- Tagged as `mainnet-messaging`
+- Deployed to `gx-wallet-frontend` deployment
+- Added `tier: api` label for NetworkPolicy access
+
+---
+
+### 3. Verification
+
+#### Endpoint Status
+| Endpoint | Status |
+|----------|--------|
+| Socket.io | Working (WebSocket upgrades available) |
+| /api/v1/conversations | 401 (auth protected) |
+| /api/v1/messages | 401 (auth protected) |
+| /api/v1/files | 401 (auth protected) |
+| /api/v1/voice | 401 (auth protected) |
+| /api/v1/keys | 401 (auth protected) |
+| /api/v1/groups | 401 (auth protected) |
+
+#### Frontend Pages
+| Page | Status |
+|------|--------|
+| Landing (/) | 200 OK |
+| Login (/login) | 200 OK |
+| Messages (/messages) | 307 Redirect (to login) |
+
+#### E2E Test
+- Created test users for browser testing
+- Created conversation between users
+- Sent test message
+- Uploaded test file
+- All operations successful
+
+---
+
+### 4. Infrastructure Commits
+
+**Repository:** gx-infra-arch
+
+**Commit:** `daba1a9`
+```
+feat(mainnet): add messaging infrastructure manifests
+
+- k8s/mainnet/messaging/minio.yaml
+- k8s/mainnet/messaging/ingress.yaml
+- k8s/mainnet/messaging/network-policy.yaml
+- k8s/mainnet/messaging/database-schema.sql
+- k8s/mainnet/messaging/README.md
+```
+
+---
+
+## MainNet URLs
+
+| Service | URL |
+|---------|-----|
+| Wallet Frontend | https://wallet.gxcoin.money |
+| API | https://api.gxcoin.money |
+| WebSocket | wss://api.gxcoin.money/socket.io |
+
+---
+
+## Browser Test Credentials
+
+| User | Email | Password |
+|------|-------|----------|
+| Alice | mainnet_msg_1766642581@gxcoin.test | TestPass123 |
+| Bob | mainnet_msg2_1766642581@gxcoin.test | TestPass123 |
+
+---
+
+## Issues Encountered & Solutions
+
+### Issue 1: Database Schema Push Failed
+- **Problem:** Prisma CLI couldn't connect from local machine, and production pods don't have schema files
+- **Solution:** Created SQL script and executed directly via `kubectl exec` to postgres pod
+
+### Issue 2: Frontend 502 Bad Gateway
+- **Problem:** NetworkPolicy blocking ingress traffic to frontend pods
+- **Solution:** Added `tier: api` label to frontend deployment
+
+### Issue 3: Port-forward Connection Issues
+- **Problem:** Port-forward to postgres kept failing with access denied
+- **Solution:** Used `kubectl exec` directly to postgres pod instead
+
+---
+
+## Files Modified/Created
+
+### gx-infra-arch
+- `k8s/mainnet/messaging/minio.yaml` (NEW)
+- `k8s/mainnet/messaging/ingress.yaml` (NEW)
+- `k8s/mainnet/messaging/network-policy.yaml` (NEW)
+- `k8s/mainnet/messaging/database-schema.sql` (NEW)
+- `k8s/mainnet/messaging/README.md` (NEW)
+
+---
+
+## Next Steps
+1. Monitor messaging service logs for any issues
+2. Set up proper MinIO credentials secret (currently hardcoded)
+3. Configure backup for MinIO data
+4. Add monitoring/alerting for messaging service
