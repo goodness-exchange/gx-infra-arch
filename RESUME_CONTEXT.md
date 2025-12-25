@@ -1,54 +1,77 @@
-# Resume Context - December 25, 2025
+# Resume Context - December 25, 2025 (Updated)
 
-## Session Summary
-Deployed and configured messaging infrastructure across all environments (DevNet, TestNet, MainNet).
-Fixed mainnet network routing to allow ports 80/443 on VPS1-3.
+## Current Task: Environment Sync & Deployment Promotion
 
-## Current State
+User identified that we were incorrectly fixing MainNet directly without following proper DevNet → TestNet → MainNet promotion workflow. Now working on syncing all environments.
 
-### Messaging Service Status
-| Environment | Pods | Health | Prometheus |
-|-------------|------|--------|------------|
-| DevNet | 1/1 Running | ✅ Healthy | ✅ Scraped |
-| TestNet | 1/1 Running | ✅ Healthy | ✅ Scraped |
-| MainNet | 2/2 Running | ✅ Healthy | ✅ Scraped |
+---
 
-### Infrastructure Components Deployed
-1. **MinIO S3 Storage** - All environments
-2. **Messaging Database Schema** - All environments
-3. **Ingress with WebSocket support** - All environments
-4. **NetworkPolicies** - Updated for messaging ports
-5. **Secrets** - `minio-credentials` in all environments
-6. **Backups** - CronJobs running every 6 hours
-7. **Monitoring** - 16 Prometheus alert rules active
+## Environment Audit Results
 
-### Key URLs
-- MainNet: https://wallet.gxcoin.money, https://api.gxcoin.money
-- TestNet: https://testnet.gxcoin.money
-- DevNet: https://devnet.gxcoin.money
+### Docker Image Discrepancies
 
-### Recent Commits (gx-infra-arch)
-```
-59d08de feat(monitoring): add messaging service Prometheus alerts
-d167303 feat(backup): add MinIO backup CronJob for all environments
-81d20fa feat(secrets): add MinIO credentials as Kubernetes secrets
-9ec1f41 fix(testnet): correct redis-secret redis-url to point to testnet
-c62d335 docs: add Redis configuration verification for all environments
-```
+| Service | DevNet | TestNet | MainNet | Status |
+|---------|--------|---------|---------|--------|
+| gx-wallet-frontend | `:https` | `:testnet` | `:mainnet-auth-fix` | ❌ ALL DIFFERENT |
+| svc-identity | `:devnet-fix` | `:2.1.9` | `:2.1.9` | ❌ DevNet different |
+| svc-messaging | `:conv-fix` | `:conv-fix` | `:conv-fix` | ✅ Synced |
+| svc-admin | `:2.1.15` | `:2.1.15` | `:2.1.15` | ✅ Synced |
+| svc-tokenomics | `:2.1.5` | `:2.1.5` | `:2.1.5` | ✅ Synced |
 
-### Files Created/Modified Today
-- `k8s/mainnet/messaging/minio.yaml`
-- `k8s/mainnet/messaging/ingress.yaml`
-- `k8s/mainnet/messaging/network-policy.yaml`
-- `k8s/mainnet/messaging/database-schema.sql`
-- `k8s/mainnet/messaging/minio-credentials-secret.yaml`
-- `k8s/mainnet/messaging/minio-backup.yaml`
-- `k8s/mainnet/messaging/monitoring-alerts.yaml`
-- `k8s/mainnet/messaging/svc-messaging-env.yaml`
-- `k8s/mainnet/messaging/README.md`
-- `WORK_RECORD_2025-12-25.md`
+### Service Availability Issues
 
-### Completed Tasks
+| Service | DevNet | TestNet | MainNet |
+|---------|--------|---------|---------|
+| svc-admin | ⚠️ 0/1 NOT READY | ✅ Ready | ✅ Ready |
+| svc-tokenomics | ⚠️ 0/1 NOT READY | ✅ Ready | ✅ Ready |
+| svc-governance | ❌ Missing | ❌ Missing | ✅ Deployed |
+| svc-loanpool | ❌ Missing | ❌ Missing | ✅ Deployed |
+| svc-organization | ❌ Missing | ❌ Missing | ✅ Deployed |
+| svc-tax | ❌ Missing | ❌ Missing | ✅ Deployed |
+
+### svc-identity Version Analysis (IN PROGRESS)
+
+Registry tags found:
+- `svc-identity`: 2.1.5, 2.1.6, 2.1.7, 2.1.8, 2.1.9, 2.2.0, 2.3.0, latest, devnet-latest
+- `gx-svc-identity`: phase2, phase2-fixed, phase2-v2, phase3-v1, phase3-v2, phase4-v1, phase4-v2, devnet-fix
+
+Image creation timestamps:
+- svc-identity:2.1.9 - Created: 2025-12-24T02:27:11 (older)
+- gx-svc-identity:devnet-fix - Created: 2025-12-24T15:09:32 (newer, ~13 hours later)
+
+**Analysis needed**: Determine which contains the latest fixes.
+
+---
+
+## User Decisions Made
+
+1. **Deploy missing services to DevNet/TestNet**: svc-governance, svc-loanpool, svc-organization, svc-tax (needed for coin grants and allocation testing)
+
+2. **svc-identity version**: Use whichever is latest/working (audit timestamps)
+
+3. **Version tag strategy**: Single version with `<env>` suffix (e.g., `v2.2.0-devnet`, `v2.2.0-testnet`, `v2.2.0-mainnet`)
+
+---
+
+## Pending Tasks
+
+1. ⏳ Audit svc-identity versions to determine latest correct version
+2. ⏸️ Establish version tag strategy (v2.2.0-<env>)
+3. ⏸️ Deploy missing services to DevNet (governance, loanpool, organization, tax)
+4. ⏸️ Deploy missing services to TestNet (governance, loanpool, organization, tax)
+5. ⏸️ Fix DevNet svc-admin (not ready)
+6. ⏸️ Fix DevNet svc-tokenomics (not ready)
+7. ⏸️ Build unified frontend with all fixes
+8. ⏸️ Sync all environments with correct images
+9. ⏸️ Design comprehensive test user data structure
+10. ⏸️ Create test data for DevNet and TestNet
+11. ⏸️ Verify all functionality on DevNet
+12. ⏸️ Document deployment promotion workflow
+
+---
+
+## Previous Session Completed Tasks
+
 1. ✅ Deploy messaging to MainNet
 2. ✅ Update frontend with messaging UI
 3. ✅ Fix Redis authentication issue
@@ -57,63 +80,46 @@ c62d335 docs: add Redis configuration verification for all environments
 6. ✅ Configure MinIO backups
 7. ✅ Add Prometheus monitoring and alerts
 8. ✅ Fix mainnet network routing (iptables DNAT for ports 80/443)
-9. ✅ Add Cloudflare DNS A records (wallet.gxcoin.money, api.gxcoin.money)
+9. ✅ Add Cloudflare DNS A records
 10. ✅ Fix NEXTAUTH_SECRET missing on mainnet frontend
 11. ✅ Fix login "Invalid Credentials" error (internal K8s routing for NextAuth)
 
-### MainNet Network Routing
-Configured iptables DNAT rules on all mainnet nodes to route ports 80/443 to ingress controller:
+---
 
-| Node | IP | Status |
-|------|-----|--------|
-| VPS1 | 72.60.210.201 | ✅ Configured |
-| VPS2 | 72.61.116.210 | ✅ Configured |
-| VPS3 | 72.61.81.3 | ✅ Configured |
+## Key URLs
 
-Ingress controller pod IP: 10.42.2.204 (runs on VPS3)
+| Environment | Frontend | API |
+|-------------|----------|-----|
+| MainNet | https://wallet.gxcoin.money | https://api.gxcoin.money |
+| TestNet | https://testnet.gxcoin.money | https://testnet.gxcoin.money |
+| DevNet | https://devnet.gxcoin.money | https://devnet.gxcoin.money |
 
-### Cloudflare DNS Configuration (Completed)
-| Domain | IP | Environment |
-|--------|-----|-------------|
-| wallet.gxcoin.money | 72.61.81.3 | MainNet |
-| api.gxcoin.money | 72.60.210.201, 72.61.116.210, 72.61.81.3 | MainNet |
-| devnet.gxcoin.money | 217.196.51.190 | DevNet |
-| testnet.gxcoin.money | 217.196.51.190 | TestNet |
+---
 
-### Remaining Next Steps
-1. Monitor messaging service logs for any issues
-2. Configure Grafana dashboard for messaging metrics
-3. Consider off-cluster backup replication for disaster recovery
-4. Consider script to auto-update DNAT rules if ingress pod IP changes
+## Quick Commands
 
-### Test Credentials (for browser testing)
-| Environment | Email | Password |
-|-------------|-------|----------|
-| MainNet | mainnet_msg_1766642581@gxcoin.test | TestPass123 |
-| MainNet | mainnet_msg2_1766642581@gxcoin.test | TestPass123 |
-
-### Important Notes
-- Redis passwords are different per environment (verified and fixed)
-- MainNet uses `redis-credentials` secret, others use `redis-secret`
-- Prometheus requires `environment` toleration to run on vps4
-- NetworkPolicies updated to allow port 3007 for metrics scraping
-
-## Quick Health Check Commands
 ```bash
-# Check all messaging pods
-kubectl get pods -l app=svc-messaging -A
-
-# Check messaging health
+# Check all pods across environments
 for ns in backend-devnet backend-testnet backend-mainnet; do
-  echo "$ns:" && kubectl exec -n $ns deploy/svc-messaging -- wget -qO- http://127.0.0.1:3007/health
+  echo "=== $ns ===" && kubectl get pods -n $ns
 done
 
-# Check MinIO pods
-kubectl get pods -l app=minio -A
+# Check service health
+for ns in backend-devnet backend-testnet backend-mainnet; do
+  echo "=== $ns ==="
+  kubectl exec -n $ns deploy/svc-identity -- wget -qO- http://127.0.0.1:3001/health 2>/dev/null || echo "svc-identity: FAILED"
+done
 
-# Check backup cronjobs
-kubectl get cronjobs -A | grep minio
-
-# Check Prometheus targets
-kubectl exec -n monitoring prometheus-0 -- wget -qO- 'http://localhost:9090/api/v1/targets?state=active' | jq -r '.data.activeTargets[] | select(.labels.app=="svc-messaging") | "\(.labels.kubernetes_namespace): \(.health)"'
+# Check image versions
+for ns in backend-devnet backend-testnet backend-mainnet; do
+  echo "=== $ns ===" && kubectl get deploy -n $ns -o custom-columns='NAME:.metadata.name,IMAGE:.spec.template.spec.containers[0].image'
+done
 ```
+
+---
+
+## Resume Instructions
+
+When resuming, continue with:
+1. Complete svc-identity version audit (compare image contents/timestamps)
+2. Proceed with environment sync following the pending tasks list
