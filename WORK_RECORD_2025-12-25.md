@@ -198,10 +198,32 @@ kubectl patch secret redis-secret -n backend-testnet --type='json' \
   -p='[{"op": "replace", "path": "/data/redis-url", "value": "<base64-encoded-correct-url>"}]'
 ```
 
+### 7. MinIO Credentials Secrets Setup
+
+Created proper Kubernetes secrets for MinIO credentials across all environments:
+
+#### Secrets Created
+| Environment | Secret Name | Keys |
+|-------------|-------------|------|
+| DevNet | minio-credentials | MINIO_ROOT_USER, MINIO_ROOT_PASSWORD, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY |
+| TestNet | minio-credentials | MINIO_ROOT_USER, MINIO_ROOT_PASSWORD, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY |
+| MainNet | minio-credentials | MINIO_ROOT_USER, MINIO_ROOT_PASSWORD, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY |
+
+#### MinIO Updates
+- Patched MinIO deployment/statefulset in all environments to use secretKeyRef
+- Removed hardcoded MINIO_ROOT_USER and MINIO_ROOT_PASSWORD values
+
+#### svc-messaging Updates
+- Removed hardcoded AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
+- Added secretKeyRef to minio-credentials secret
+
+#### Verification
+- All services rolled out successfully
+- Health checks passing on all environments
+
 ---
 
 ## Next Steps
 1. Monitor messaging service logs for any issues
-2. Set up proper MinIO credentials secret (currently hardcoded)
-3. Configure backup for MinIO data
-4. Add monitoring/alerting for messaging service
+2. Configure backup for MinIO data
+3. Add monitoring/alerting for messaging service
