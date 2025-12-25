@@ -303,7 +303,62 @@ prometheus.io/path: "/metrics"
 
 ---
 
+### 10. MainNet Network Routing Fix
+
+Fixed ports 80/443 accessibility on mainnet VPS nodes (VPS1, VPS2, VPS3).
+
+#### Problem
+- MetalLB LoadBalancer assigned external IP 217.196.51.190 (VPS4) to ingress service
+- Ports 80/443 were not accessible on mainnet nodes (VPS1, VPS2, VPS3)
+- Only NodePorts 31088/31606 were working on mainnet nodes
+
+#### Root Cause
+MetalLB only binds ports 80/443 on the node announcing the LoadBalancer IP. Since the ingress service was assigned VPS4's IP, only VPS4 had ports 80/443 bound.
+
+#### Solution
+Added iptables DNAT rules on all three mainnet nodes to redirect ports 80/443 to the ingress controller pod:
+
+```bash
+# DNAT rules for port forwarding
+iptables -t nat -I PREROUTING 1 -p tcp -d <node_ip> --dport 80 -j DNAT --to-destination 10.42.2.204:80
+iptables -t nat -I PREROUTING 1 -p tcp -d <node_ip> --dport 443 -j DNAT --to-destination 10.42.2.204:443
+
+# MASQUERADE for return path
+iptables -t nat -A POSTROUTING -d 10.42.2.204 -p tcp --dport 80 -j MASQUERADE
+iptables -t nat -A POSTROUTING -d 10.42.2.204 -p tcp --dport 443 -j MASQUERADE
+
+# Save rules persistently
+iptables-save > /etc/sysconfig/iptables
+```
+
+#### Nodes Configured
+| Node | IP | Status |
+|------|-----|--------|
+| VPS1 | 72.60.210.201 | ✅ Configured |
+| VPS2 | 72.61.116.210 | ✅ Configured |
+| VPS3 | 72.61.81.3 | ✅ Configured |
+
+#### Verification
+All three mainnet nodes now serve wallet.gxcoin.money correctly on ports 80 and 443.
+
+#### DNS Configuration Required
+Add Cloudflare A records (user action required):
+
+| Domain | IP | Environment |
+|--------|-----|-------------|
+| wallet.gxcoin.money | 72.61.81.3 (or any VPS1-3) | MainNet |
+| api.gxcoin.money | 72.61.81.3 (or any VPS1-3) | MainNet |
+| testnet.gxcoin.money | 217.196.51.190 | TestNet |
+| devnet.gxcoin.money | 217.196.51.190 | DevNet |
+
+#### Important Note
+The DNAT rules point to the ingress controller pod IP (10.42.2.204). If the ingress controller pod is rescheduled to a different node or gets a new IP, the iptables rules will need to be updated. Current ingress controller runs on VPS3 (srv1092158.hstgr.cloud).
+
+---
+
 ## Next Steps
-1. Monitor messaging service logs for any issues
-2. Configure Grafana dashboard for messaging metrics visualization
-3. Consider off-cluster backup replication for disaster recovery
+1. Add DNS A records in Cloudflare for wallet.gxcoin.money and api.gxcoin.money
+2. Monitor messaging service logs for any issues
+3. Configure Grafana dashboard for messaging metrics visualization
+4. Consider off-cluster backup replication for disaster recovery
+5. Consider implementing a script to auto-update DNAT rules when ingress pod IP changes
