@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gx-admin-frontend
+  namespace: backend-devnet
+  labels:
+    app: gx-admin-frontend
+    environment: devnet
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gx-admin-frontend
+  template:
+    metadata:
+      labels:
+        app: gx-admin-frontend
+        environment: devnet
+    spec:
+      containers:
+      - name: gx-admin-frontend
+        image: 10.43.75.195:5000/gx-admin-frontend:v1.0.2
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+          protocol: TCP
+        env:
+        - name: NODE_ENV
+          value: production
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      nodeSelector:
+        kubernetes.io/hostname: srv1089624.hstgr.cloud
+      tolerations:
+      - key: environment
+        operator: Equal
+        value: nonprod
+        effect: NoSchedule
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gx-admin-frontend
+  namespace: backend-devnet
+  labels:
+    app: gx-admin-frontend
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 3000
+    protocol: TCP
+  selector:
+    app: gx-admin-frontend

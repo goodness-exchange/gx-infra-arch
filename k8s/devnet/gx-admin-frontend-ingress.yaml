@@ -1,0 +1,35 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gx-admin-ingress
+  namespace: backend-devnet
+  annotations:
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Authorization, Content-Type"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: admin.gxcoin.money
+    http:
+      paths:
+      # Admin backend API routes
+      - path: /api/v1/admin
+        pathType: Prefix
+        backend:
+          service:
+            name: svc-admin
+            port:
+              number: 80
+      # Admin frontend (catch-all for Next.js)
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: gx-admin-frontend
+            port:
+              number: 80
