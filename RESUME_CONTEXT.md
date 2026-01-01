@@ -1,125 +1,103 @@
-# Resume Context - December 25, 2025 (Updated)
+# Resume Context - Last Updated: December 26, 2025 ~03:20 UTC
 
-## Current Task: Environment Sync & Deployment Promotion
+## Quick Status
 
-User identified that we were incorrectly fixing MainNet directly without following proper DevNet → TestNet → MainNet promotion workflow. Now working on syncing all environments.
+| Environment | Backend | Fabric | Blockchain Transactions |
+|-------------|---------|--------|------------------------|
+| DevNet | ✅ Working | ✅ Working | ✅ Working |
+| TestNet | ✅ Working | ✅ Working | ✅ Working |
+| MainNet | ✅ Working | ⚠️ Partial | ❌ Blocked |
+
+## Current Priority: MainNet Blockchain
+
+### What Was Done Today (Dec 26)
+
+1. **Environment Synchronization** (COMPLETED)
+   - Fixed NetworkPolicy `allow-internal-backend` to include fabric ports to `fabric-mainnet`
+   - Updated ConfigMap `backend-config` with correct MainNet values
+   - Verified TLS certificates across all environments
+   - Created documentation: `ENVIRONMENT_SYNC_2025-12-26.md`
+
+2. **MainNet Blockchain Transaction Test** (BLOCKED)
+   - Test user registered: `mainnet_test_1766718021@gxcoin.money`
+   - CREATE_USER commands fail due to cross-node chaincode issue
+
+### Current Issue
+
+**Problem:** Peer0-org2 cannot connect to external chaincode
+
+**Topology:**
+```
+Node srv1089618:
+  - gxtv3-chaincode-0 ✅
+  - peer0-org1-0 ✅ (works - same node as chaincode)
+
+Node srv1117946:
+  - peer0-org2-0 ❌ (fails - different node from chaincode)
+```
+
+**Error:**
+```
+timeout expired while starting chaincode gxtv3-mainnet
+```
+
+**Observation:** DevNet has identical topology but works. Difference may be:
+- DevNet uses short service name: `gxtv3-devnet:7052`
+- MainNet uses FQDN: `gxtv3-chaincode.fabric-mainnet.svc.cluster.local:7052`
+
+### Next Steps
+
+1. Compare DevNet vs MainNet chaincode package connection.json
+2. Update MainNet chaincode package with short service name OR
+3. Scale chaincode to run on multiple nodes
+
+## Key Files Created Today
+
+| File | Purpose |
+|------|---------|
+| `SESSION_CONTEXT_2025-12-26.md` | Detailed session context |
+| `WORK_RECORD_2025-12-26.md` | Work log |
+| `ENVIRONMENT_SYNC_2025-12-26.md` | Environment sync documentation |
+
+## Critical Commands
+
+```bash
+# Check MainNet blockchain status
+kubectl logs -n backend-mainnet deploy/outbox-submitter --tail=30
+kubectl logs -n fabric-mainnet peer0-org2-0 --tail=30 | grep chaincode
+
+# Reset failed commands
+kubectl exec -n backend-mainnet postgres-0 -- psql -U gx_admin -d gx_protocol -c \
+  "UPDATE \"OutboxCommand\" SET status='PENDING', attempts=0 WHERE status='FAILED';"
+
+# Check command status
+kubectl exec -n backend-mainnet postgres-0 -- psql -U gx_admin -d gx_protocol -c \
+  "SELECT \"commandType\", status, \"fabricTxId\" FROM \"OutboxCommand\" ORDER BY \"createdAt\" DESC LIMIT 5;"
+```
+
+## Namespaces Reference
+
+| Environment | Backend Namespace | Fabric Namespace |
+|-------------|-------------------|------------------|
+| DevNet | backend-devnet | fabric / fabric-devnet |
+| TestNet | backend-testnet | fabric-testnet |
+| MainNet | backend-mainnet | fabric-mainnet |
 
 ---
 
-## Environment Audit Results
+## Previous Session Context (Dec 25)
 
-### Docker Image Discrepancies
+### Environment Sync Tasks (from earlier)
 
-| Service | DevNet | TestNet | MainNet | Status |
-|---------|--------|---------|---------|--------|
-| gx-wallet-frontend | `:https` | `:testnet` | `:mainnet-auth-fix` | ❌ ALL DIFFERENT |
-| svc-identity | `:devnet-fix` | `:2.1.9` | `:2.1.9` | ❌ DevNet different |
-| svc-messaging | `:conv-fix` | `:conv-fix` | `:conv-fix` | ✅ Synced |
-| svc-admin | `:2.1.15` | `:2.1.15` | `:2.1.15` | ✅ Synced |
-| svc-tokenomics | `:2.1.5` | `:2.1.5` | `:2.1.5` | ✅ Synced |
+Some tasks may still be pending:
+- Deploy missing services (governance, loanpool, organization, tax) to DevNet/TestNet
+- svc-identity version audit
+- Version tag strategy implementation
 
-### Service Availability Issues
-
-| Service | DevNet | TestNet | MainNet |
-|---------|--------|---------|---------|
-| svc-admin | ⚠️ 0/1 NOT READY | ✅ Ready | ✅ Ready |
-| svc-tokenomics | ⚠️ 0/1 NOT READY | ✅ Ready | ✅ Ready |
-| svc-governance | ❌ Missing | ❌ Missing | ✅ Deployed |
-| svc-loanpool | ❌ Missing | ❌ Missing | ✅ Deployed |
-| svc-organization | ❌ Missing | ❌ Missing | ✅ Deployed |
-| svc-tax | ❌ Missing | ❌ Missing | ✅ Deployed |
-
-### svc-identity Version Analysis (IN PROGRESS)
-
-Registry tags found:
-- `svc-identity`: 2.1.5, 2.1.6, 2.1.7, 2.1.8, 2.1.9, 2.2.0, 2.3.0, latest, devnet-latest
-- `gx-svc-identity`: phase2, phase2-fixed, phase2-v2, phase3-v1, phase3-v2, phase4-v1, phase4-v2, devnet-fix
-
-Image creation timestamps:
-- svc-identity:2.1.9 - Created: 2025-12-24T02:27:11 (older)
-- gx-svc-identity:devnet-fix - Created: 2025-12-24T15:09:32 (newer, ~13 hours later)
-
-**Analysis needed**: Determine which contains the latest fixes.
-
----
-
-## User Decisions Made
-
-1. **Deploy missing services to DevNet/TestNet**: svc-governance, svc-loanpool, svc-organization, svc-tax (needed for coin grants and allocation testing)
-
-2. **svc-identity version**: Use whichever is latest/working (audit timestamps)
-
-3. **Version tag strategy**: Single version with `<env>` suffix (e.g., `v2.2.0-devnet`, `v2.2.0-testnet`, `v2.2.0-mainnet`)
-
----
-
-## Pending Tasks
-
-1. ⏳ Audit svc-identity versions to determine latest correct version
-2. ⏸️ Establish version tag strategy (v2.2.0-<env>)
-3. ⏸️ Deploy missing services to DevNet (governance, loanpool, organization, tax)
-4. ⏸️ Deploy missing services to TestNet (governance, loanpool, organization, tax)
-5. ⏸️ Fix DevNet svc-admin (not ready)
-6. ⏸️ Fix DevNet svc-tokenomics (not ready)
-7. ⏸️ Build unified frontend with all fixes
-8. ⏸️ Sync all environments with correct images
-9. ⏸️ Design comprehensive test user data structure
-10. ⏸️ Create test data for DevNet and TestNet
-11. ⏸️ Verify all functionality on DevNet
-12. ⏸️ Document deployment promotion workflow
-
----
-
-## Previous Session Completed Tasks
-
-1. ✅ Deploy messaging to MainNet
-2. ✅ Update frontend with messaging UI
-3. ✅ Fix Redis authentication issue
-4. ✅ Fix testnet redis-secret URL
-5. ✅ Set up MinIO credentials as secrets
-6. ✅ Configure MinIO backups
-7. ✅ Add Prometheus monitoring and alerts
-8. ✅ Fix mainnet network routing (iptables DNAT for ports 80/443)
-9. ✅ Add Cloudflare DNS A records
-10. ✅ Fix NEXTAUTH_SECRET missing on mainnet frontend
-11. ✅ Fix login "Invalid Credentials" error (internal K8s routing for NextAuth)
-
----
-
-## Key URLs
+### Key URLs
 
 | Environment | Frontend | API |
 |-------------|----------|-----|
 | MainNet | https://wallet.gxcoin.money | https://api.gxcoin.money |
 | TestNet | https://testnet.gxcoin.money | https://testnet.gxcoin.money |
 | DevNet | https://devnet.gxcoin.money | https://devnet.gxcoin.money |
-
----
-
-## Quick Commands
-
-```bash
-# Check all pods across environments
-for ns in backend-devnet backend-testnet backend-mainnet; do
-  echo "=== $ns ===" && kubectl get pods -n $ns
-done
-
-# Check service health
-for ns in backend-devnet backend-testnet backend-mainnet; do
-  echo "=== $ns ==="
-  kubectl exec -n $ns deploy/svc-identity -- wget -qO- http://127.0.0.1:3001/health 2>/dev/null || echo "svc-identity: FAILED"
-done
-
-# Check image versions
-for ns in backend-devnet backend-testnet backend-mainnet; do
-  echo "=== $ns ===" && kubectl get deploy -n $ns -o custom-columns='NAME:.metadata.name,IMAGE:.spec.template.spec.containers[0].image'
-done
-```
-
----
-
-## Resume Instructions
-
-When resuming, continue with:
-1. Complete svc-identity version audit (compare image contents/timestamps)
-2. Proceed with environment sync following the pending tasks list
